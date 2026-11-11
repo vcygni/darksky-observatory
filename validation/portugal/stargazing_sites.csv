@@ -1,10 +1,10 @@
 WKT,name,region,expected_sqm,sqm_source,sqm_type,description
-"POINT (-7.3816 38.4444)",Dark Sky Alqueva Observatory (Cumeada),mainland,21.43,Lima et al. 2016 DOI:10.1080/15287394.2016.1153446,measured,IDA Reserve. Mean of field campaign SQM-L measurements. Live monitor at sqmmonitor.darkskyalqueva.com
+"POINT (-7.513822 38.366954)",Dark Sky Alqueva Observatory (Cumeada),mainland,21.43,Lima et al. 2016 DOI:10.1080/15287394.2016.1153446,measured,"IDA Reserve. Mean of field campaign SQM-L measurements. Live monitor at sqmmonitor.darkskyalqueva.com | Coordinate corrected 2026-10-08 (was 38.4444 -7.3816 = Monsaraz village, ~14 km off): OSM node/10798812305; official site gives 38.3669459 -7.515952."
 "POINT (-7.0631 38.1782)",Castle of Noudar,mainland,21.3,IDA certification 2018,measured,IDA certified dark-sky fortress. Dedicated observation platform in open grassland
 "POINT (-7.95 40.05)",PASO Observatory (Pampilhosa da Serra),mainland,21.1,Barbosa et al. 2024 arXiv:2404.04090,measured,Space Situational Awareness observatory. Confirmed SQM >= 21.1 in CLOWN paper
-"POINT (-8.162 41.730)",Peneda-Geres National Park (Porta do Mezio),mainland,21.3,Lima 2015 PhD dissertation (ProQuest),measured,Northern entrance area. Field campaign by Lima
+"POINT (-8.313127 41.884849)",Peneda-Geres National Park (Porta do Mezio),mainland,21.3,Lima 2015 PhD dissertation (ProQuest),measured,"Northern entrance area. Field campaign by Lima | Coordinate corrected 2026-10-08 (was 41.730 -8.162 = Geres town, ~20 km off): OSM way/165541903 Porta do Mezio (tourism=information)."
 "POINT (-7.533 38.417)",Monsaraz Observatory,mainland,21.4,Dark Sky Alqueva monitoring network,measured,Part of Dark Sky Alqueva reserve monitoring. Continuous SQM station
-"POINT (-7.80 38.20)",Alqueva Lake (eastern shore),mainland,21.5,Lima et al. 2016 (best measurement 21.88),measured,Core of Dark Sky Reserve. Darkest measured point in the reserve
+"POINT (-7.80 38.20)",Alqueva Lake (eastern shore),mainland,21.5,Lima et al. 2016 (best measurement 21.88),measured,"Core of Dark Sky Reserve. Darkest measured point in the reserve | UNRESOLVED 2026-10-08: 38.20 -7.80 is Vidigueira town, ~25 km west of the lake's eastern shore; true measurement location unknown."
 "POINT (-7.45 38.12)",Barrancos (Serra de Ficalho),mainland,21.4,Estimated from Falchi 2016 World Atlas,estimated,Most remote municipality in mainland Portugal. No ground SQM available
 "POINT (-8.287 37.835)",Messejana (Alto da Vigia),mainland,21.2,Estimated from Falchi 2016 World Atlas,estimated,Hilltop in dark Alentejo interior. No ground SQM available
 "POINT (-7.602 37.947)",Serpa (Pulo do Lobo),mainland,21.2,Estimated from Falchi 2016 World Atlas,estimated,Waterfall viewpoint in deep Alentejo. No ground SQM available
@@ -31,4 +31,4 @@ WKT,name,region,expected_sqm,sqm_source,sqm_type,description
 "POINT (-25.489 37.769)",Lagoa do Fogo viewpoint (Sao Miguel Azores),azores,21.5,Estimated from Falchi 2016 World Atlas,estimated,Volcanic crater lake. Mid-Atlantic darkness
 "POINT (-31.099 39.708)",Caldeirão viewpoint (Flores Azores),azores,21.8,Estimated from Falchi 2016 (extreme western isolation),estimated,Remote western Azores. Among darkest in Atlantic
 "POINT (-27.376 38.767)",Ponta do Queimado (Faial Azores),azores,21.6,Estimated from Falchi 2016 World Atlas,estimated,Western tip Faial island. Ocean-facing
-"POINT (-7.384 38.452)",Monsaraz (Castle viewpoint),mainland,21.4,Dark Sky Alqueva monitoring network,measured,Medieval castle overlooking Alqueva. Part of reserve
+"POINT (-7.380896 38.443357)",Monsaraz (Castle viewpoint),mainland,21.4,Dark Sky Alqueva monitoring network,measured,"Medieval castle overlooking Alqueva. Part of reserve | Coordinate corrected 2026-10-08 (was 38.452 -7.384, ~1 km north of the castle): OSM way/135069846 Castelo de Monsaraz."

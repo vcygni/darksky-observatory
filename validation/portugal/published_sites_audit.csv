@@ -1,0 +1,8 @@
+name,use,value_verified,location_verified,reason
+Dark Sky Alqueva Observatory (Cumeada),indicative,partial,partial,"Source exists: Lima, Pinto da Cunha & Peixinho (2016) 'Light pollution: Assessment of sky glow on two dark sky regions of Portugal', J. Toxicol. Environ. Health A, doi:10.1080/15287394.2016.1153446 (Crossref). Paywalled: the per-site value 21.43 and that it was measured at the observatory could not be checked."
+Castle of Noudar,excluded,no,yes,"Cited 'IDA certification 2018' with SQM 21.3: no record of such a certification or value found; Noudar lies in the Alqueva Starlight reserve (Starlight Foundation, not IDA)."
+PASO Observatory (Pampilhosa da Serra),excluded,no,no,"Cited source (Barbosa et al. 2024, arXiv:2404.04090) gives no SQM value; the CSV value is a lower bound ('>= 21.1') attributed to another paper; coordinates at 0.01 deg (~1 km)."
+Peneda-Geres National Park (Porta do Mezio),indicative,partial,partial,"Source: Lima 2015 PhD dissertation (not accessible) / Lima et al. 2016 (two dark-sky regions of Portugal). Location corrected to Porta do Mezio (OSM way/165541903) on 2026-10-08; exact measurement point not verifiable."
+Monsaraz Observatory,excluded,no,no,"'Dark Sky Alqueva monitoring network': no verifiable station record; the Observatório do Lago Alqueva is not mapped and the coordinate is unverified."
+Alqueva Lake (eastern shore),excluded,partial,no,"Coordinate 38.20 -7.80 is Vidigueira town, ~25 km west of the lake's eastern shore; true measurement location unknown."
+Monsaraz (Castle viewpoint),excluded,no,yes,"'Dark Sky Alqueva monitoring network': no verifiable station record or value provenance."

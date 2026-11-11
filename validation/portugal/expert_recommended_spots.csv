@@ -1,6 +1,6 @@
 WKT,name,region,recommended_by,description
 "POINT (-7.381 38.444)",Monsaraz,mainland,Dark Sky Alqueva; Visit Portugal; travel guides,Walled hilltop village overlooking Alqueva lake. Most iconic stargazing destination in Portugal.
-"POINT (-7.44 38.43)",Cumeada Observatory,mainland,Dark Sky Alqueva,Official Dark Sky Alqueva headquarters and observatory. Live SQM monitoring.
+"POINT (-7.513822 38.366954)",Cumeada Observatory,mainland,Dark Sky Alqueva,"Official Dark Sky Alqueva headquarters and observatory. Live SQM monitoring. | Coordinate corrected 2026-10-08 (was 38.43 -7.44, ~10 km off): OSM node/10798812305."
 "POINT (-7.533 38.417)",Reguengos de Monsaraz,mainland,Dark Sky Alqueva; Visit Portugal,Municipality center of Dark Sky Alqueva reserve.
 "POINT (-7.367 38.333)",Mourão,mainland,Visit Portugal (Dark Sky Route),Dark Sky Route municipality. Isolated eastern Alentejo.
 "POINT (-6.967 38.117)",Barrancos,mainland,Visit Portugal (Dark Sky Route),Most remote municipality in mainland Portugal. Spanish border.

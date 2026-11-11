@@ -1,0 +1,17 @@
+/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
+  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
+stars201   38.75550   -6.98450 dark+moonless   219347 readings  843 nights  mode  20.59  median  20.45  Finca La Cocosa / Badajoz / Badajoz / Un
+/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
+  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
+stars218   38.18984   -5.95709 dark+moonless   124616 readings  381 nights  mode  21.16  median  20.98  Alcazaba de la Reina / Extremadura / Unk
+/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
+  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
+stars218   39.10950   -6.68920 dark+moonless   135804 readings  508 nights  mode  21.11  median  21.06  La Roca de la Sierra / La Roca de la Sie
+/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
+  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
+stars271   38.74278   -7.21000 dark+moonless    89099 readings  292 nights  mode  18.91  median  18.96  Olivenza / Olivenza / Badajoz / Unknown 
+/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
+  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
+stars271   38.74278   -7.20999 dark+moonless    97059 readings  313 nights  mode  19.64  median  19.54  Puerto Villareal / Olivenza / Unknown / 
+/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
+  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())

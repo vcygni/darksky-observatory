@@ -10,6 +10,7 @@ Ground-truth datasets used to validate the PSF skyglow model and pipeline output
 | `expert_recommended_spots.csv` | 20 | Locations | Astrotourism-recommended spots |
 | `darkskysites/` | 1,920 | SQM grid | darkskysites.com VIIRS-based reference model |
 | `tess-ida/` | 20 stations | Continuous monitoring | Stars4All TESS photometer network (6.4M readings) |
+| `official_observation_points.csv` | 18 | Locations | Official/public stargazing observation points with exact positions (access-point threshold) |
 
 ## stargazing_sites.csv
 
@@ -56,3 +57,20 @@ TESS (Telescope Encoder and Sky Sensor) photometer data from the Stars4All Europ
 **Validation use:** Continuous instrumental ground-truth (6.4M nighttime readings). Best-night max SQM compared against PSF predictions.
 
 See `tess-ida/README.md` for station details and download instructions.
+
+## official_observation_points.csv
+
+18 stargazing observation points designated by an official body (Dark Sky Alqueva, Dark Sky Vale do Tua, Município de Arganil / Góis for Dark Sky Aldeias do Xisto, IDA certification) or public astronomical observatories outside cities. Each was located as an exact OpenStreetMap feature by name (or from official coordinates) — `osm_ref`, `location_method`, `source_url` and `confidence` (12 high, 6 medium) are recorded per row. Points that could only be placed at village level (e.g. the Aldeias do Xisto "viewpoints" above, given at 0.01°) are excluded.
+
+**Use:** derives `MAX_WALK_M` in `access_points.py` (largest distance to a drivable road = 358 m); see `scripts/derive_access_thresholds.py`.
+
+## Corrections (2026-10-08)
+
+| File | Site | Old | New | Evidence |
+|------|------|-----|-----|----------|
+| stargazing_sites.csv | Dark Sky Alqueva Observatory (Cumeada) | 38.4444, −7.3816 (Monsaraz village) | 38.366954, −7.513822 | OSM node/10798812305; official site 38.3669459, −7.515952 |
+| stargazing_sites.csv | Peneda-Gerês (Porta do Mezio) | 41.730, −8.162 (Gerês town) | 41.884849, −8.313127 | OSM way/165541903 "Porta do Mezio" |
+| stargazing_sites.csv | Monsaraz (Castle viewpoint) | 38.452, −7.384 | 38.443357, −7.380896 | OSM way/135069846 Castelo de Monsaraz |
+| expert_recommended_spots.csv | Cumeada Observatory | 38.43, −7.44 | 38.366954, −7.513822 | as above |
+
+Flagged, not corrected: "Alqueva Lake (eastern shore)" (38.20, −7.80) is Vidigueira town, ~25 km west of the eastern shore; true location unknown.
