@@ -195,6 +195,66 @@ def run_full_assessment(
     return spots
 
 
+DEDUP_RADIUS_M = 1000  # product choice: one recommendation per ~1 km
+DENSITY_CELL_DEG = 0.25  # product choice: ~25 km cells
+DENSITY_MAX_PER_CELL = 5
+
+
+def _rank_order(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Best first: SSI descending, ties broken by OSM id, so results never depend on input order."""
+    tiebreak = spots["id"].astype(str) if "id" in spots.columns else spots.index.astype(str)
+    return (
+        spots.assign(_tiebreak=tiebreak)
+        .sort_values(["ssi_score", "_tiebreak"], ascending=[False, True], kind="mergesort")
+        .drop(columns="_tiebreak")
+    )
+
+
+def thin_spatially(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Deduplicate within DEDUP_RADIUS_M, then cap spots per fixed grid cell.
+
+    Deterministic: the output depends only on the set of spots, not their order.
+    - Deduplication is greedy non-maximum suppression: spots are visited
+      best-first and any spot within DEDUP_RADIUS_M of a kept spot is dropped.
+    - The density grid is anchored at fixed multiples of DENSITY_CELL_DEG
+      (not at the data's minimum lat/lon), so adding or removing a spot only
+      affects its own cell.
+    """
+    if "ssi_score" not in spots.columns or len(spots) <= 1:
+        return spots
+    from scipy.spatial import cKDTree
+
+    ranked = _rank_order(spots).reset_index(drop=True)
+    utm = ranked.to_crs(epsg=32629)
+    coords = np.column_stack([utm.geometry.x, utm.geometry.y])
+    tree = cKDTree(coords)
+    suppressed = np.zeros(len(ranked), dtype=bool)
+    keep = []
+    for i in range(len(ranked)):
+        if suppressed[i]:
+            continue
+        keep.append(i)
+        suppressed[tree.query_ball_point(coords[i], r=DEDUP_RADIUS_M)] = True
+    n_dup = len(ranked) - len(keep)
+    ranked = ranked.iloc[keep]
+    if n_dup:
+        logger.info("  Deduplication: removed %d spots within %d m of a better spot", n_dup, DEDUP_RADIUS_M)
+
+    if len(ranked) > 100:
+        cell_y = np.floor(ranked.geometry.y / DENSITY_CELL_DEG).astype(int)
+        cell_x = np.floor(ranked.geometry.x / DENSITY_CELL_DEG).astype(int)
+        capped = ranked.groupby([cell_y, cell_x], sort=False).head(DENSITY_MAX_PER_CELL)
+        n_cap = len(ranked) - len(capped)
+        ranked = capped
+        if n_cap:
+            logger.info(
+                "  Density cap: removed %d spots (max %d per %.2f deg cell, fixed grid)",
+                n_cap, DENSITY_MAX_PER_CELL, DENSITY_CELL_DEG,
+            )
+    return ranked
+
+
+
 def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Remove spots that are physically unsuitable for stargazing.
 
@@ -262,50 +322,6 @@ def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     n_dest = is_tier1.sum()
     logger.info("  Tiered: %d destinations + %d candidates", n_dest, n_final - n_dest)
 
-    # Spatial deduplication: within 1km, keep only the highest-SSI spot
-    if "ssi_score" in spots.columns and len(spots) > 1:
-        from scipy.spatial import cKDTree
-        spots = spots.reset_index(drop=True)
-        spots_utm = spots.to_crs(epsg=32629)
-        coords = np.column_stack([spots_utm.geometry.x, spots_utm.geometry.y])
-        tree = cKDTree(coords)
-        pairs = tree.query_pairs(r=1000)
-
-        to_remove = set()
-        for i, j in pairs:
-            if i in to_remove or j in to_remove:
-                continue
-            if spots.iloc[i]["ssi_score"] >= spots.iloc[j]["ssi_score"]:
-                to_remove.add(j)
-            else:
-                to_remove.add(i)
-
-        if to_remove:
-            keep_mask = ~spots.index.isin(to_remove)
-            spots = spots[keep_mask]
-            logger.info("  Deduplication: removed %d spots within 1km of a better spot", len(to_remove))
-
-    # Grid-based density cap: max 5 spots per 0.25 deg cell (~25km grid)
-    if "ssi_score" in spots.columns and len(spots) > 100:
-        cell_size = 0.25
-        keep_indices = []
-        lat_range = (spots.geometry.y.min(), spots.geometry.y.max())
-        lon_range = (spots.geometry.x.min(), spots.geometry.x.max())
-
-        for lat in np.arange(lat_range[0], lat_range[1], cell_size):
-            for lon in np.arange(lon_range[0], lon_range[1], cell_size):
-                in_cell = spots[
-                    (spots.geometry.y >= lat) & (spots.geometry.y < lat + cell_size) &
-                    (spots.geometry.x >= lon) & (spots.geometry.x < lon + cell_size)
-                ]
-                if len(in_cell) > 0:
-                    top = in_cell.nlargest(min(5, len(in_cell)), "ssi_score")
-                    keep_indices.extend(top.index.tolist())
-
-        n_before_cap = len(spots)
-        spots = spots.loc[keep_indices]
-        n_removed = n_before_cap - len(spots)
-        if n_removed > 0:
-            logger.info("  Density cap: removed %d spots (max 5 per 25km cell)", n_removed)
+    spots = thin_spatially(spots)
 
     return spots.reset_index(drop=True)
