@@ -25,6 +25,7 @@ import geopandas as gpd
 import pandas as pd
 import xarray as xr
 
+from stargazing_spots.access_points import DEFAULT_OSM_PBF, enrich_geojson_file
 from stargazing_spots.assess import filter_unsuitable, run_full_assessment
 from stargazing_spots.change_detection import run_change_detection
 from stargazing_spots.enrichment import (
@@ -34,6 +35,7 @@ from stargazing_spots.enrichment import (
 )
 from stargazing_spots.enrichment_raster import raster_sample_with_context
 from stargazing_spots.export import to_cog, to_geojson, to_parquet
+from stargazing_spots.osm_extract import extract_features_from_pbf
 from stargazing_spots.processing import (
     classify_dark_sky,
     classify_temporal,
@@ -438,6 +440,17 @@ def main():
         default=500,
         help="Buffer distance in meters for spatial join",
     )
+    parser.add_argument(
+        "--osm-pbf",
+        type=Path,
+        default=DEFAULT_OSM_PBF,
+        help="OpenStreetMap .osm.pbf extract: candidate features (unless --from-geojson) and access points",
+    )
+    parser.add_argument(
+        "--skip-access-points",
+        action="store_true",
+        help="Skip adding drivable access points to the merged spots",
+    )
 
     args = parser.parse_args()
 
@@ -451,6 +464,23 @@ def main():
         _run_all_regions(args, REGIONS)
     else:
         _run_single(args)
+
+
+def _load_candidate_features(args) -> gpd.GeoDataFrame | None:
+    """Candidate OSM features: --from-geojson, else the local OSM extract.
+
+    Returns None (online osmnx query in run_pipeline) only if neither exists.
+    """
+    if args.from_geojson:
+        logger.info("Loading pre-computed features from %s", args.from_geojson)
+        features = gpd.read_file(str(args.from_geojson))
+    elif args.osm_pbf.exists():
+        features, _ = extract_features_from_pbf(args.osm_pbf)
+    else:
+        logger.warning("No --from-geojson and no %s: querying OSM online", args.osm_pbf)
+        return None
+    logger.info("Loaded %d features", len(features))
+    return features
 
 
 def _run_single(args):
@@ -469,11 +499,7 @@ def _run_single(args):
         dataset = fetch_viirs_radiance(boundary_gdf, date_range="2023-01-01")
         radiance = extract_radiance_layer(dataset, "2023-01-01")
 
-    preloaded = None
-    if args.from_geojson:
-        logger.info("Loading pre-computed features from %s", args.from_geojson)
-        preloaded = gpd.read_file(str(args.from_geojson))
-        logger.info("Loaded %d features", len(preloaded))
+    preloaded = _load_candidate_features(args)
 
     temporal_layers = None
     temporal_labels = None
@@ -515,11 +541,7 @@ def _run_all_regions(args, regions: dict):
     for old_file in args.output_dir.glob("spots_all.*"):
         old_file.unlink()
 
-    preloaded = None
-    if args.from_geojson:
-        logger.info("Loading pre-computed features from %s", args.from_geojson)
-        preloaded = gpd.read_file(str(args.from_geojson))
-        logger.info("Loaded %d features", len(preloaded))
+    preloaded = _load_candidate_features(args)
 
     for region_name, region_info in regions.items():
         suffix = region_info["suffix"]
@@ -594,6 +616,16 @@ def _run_all_regions(args, regions: dict):
         }
         to_geojson(merged, merged_path, processing_params=processing_params)
         to_parquet(merged, args.output_dir / "spots_all.parquet")
+
+        # Drivable access points (GeoJSON only; this is what the guide API consumes)
+        if args.skip_access_points:
+            logger.info("Access points skipped (--skip-access-points)")
+        elif args.osm_pbf.exists():
+            enrich_geojson_file(merged_path, args.osm_pbf)
+        else:
+            logger.warning(
+                "Access points skipped: %s not found (run `make download-osm`)", args.osm_pbf
+            )
 
         logger.info("Merged output: %d total spots across %d regions", len(merged), len(all_spots))
         for region, m in region_metrics.items():
