@@ -1,18 +1,17 @@
 """Fit CALIB_FACTOR against TESS clear-sky values, with leave-one-out error.
 
 The PSF model has one free scale: SQM = f(CALIB_FACTOR * PSF-integral + natural).
-CALIB_FACTOR = 0.04237 in skyglow.py has no fitting code in the repository and
-was checked against the same points it was reportedly fitted on. This script:
+This script:
 
   1. builds the PSF integral once (CALIB_FACTOR divided out);
   2. takes TESS clear-sky sites, one value per model pixel (same grouping as
      validate.run_validation);
-  3. reports metrics for the current constant, an in-sample least-squares fit
+  3. reports metrics for the constant in skyglow.py, the least-squares fit
      (squared error in mag), and leave-one-out: for each pixel, fit on all the
-     others and predict the held-out one. Only the LOO error estimates accuracy
-     at a site the calibration has not seen.
+     others and predict the held-out one. Only the leave-one-out error estimates
+     accuracy at a site the calibration has not seen.
 
-It does not change skyglow.py.
+skyglow.CALIB_FACTOR is set by hand from the in-sample fit.
 
 Usage:
     cd apps/stargazing_spots

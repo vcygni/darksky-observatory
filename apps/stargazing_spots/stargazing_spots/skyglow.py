@@ -1,8 +1,7 @@
 """PSF skyglow propagation model.
 
 FFT convolution of VIIRS radiance with a Garstang/Duriscoe PSF kernel to
-predict clear-sky SQM at each observation point. CALIB_FACTOR: see the note at
-its definition; systematic uncertainty +/-0.5 mag vs full RT.
+predict clear-sky zenith SQM. CALIB_FACTOR is fitted to TESS photometers.
 """
 
 import logging
@@ -17,12 +16,9 @@ logger = logging.getLogger(__name__)
 NATURAL_SKY_MCDM2 = 0.171  # Natural zenith brightness (mcd/m^2), Falchi 2016
 NATURAL_SKY_SQM = 22.0  # mag/arcsec^2 at solar minimum
 
-# Reported as a least-squares fit against 27 ground-truth points (MAE = 0.48 mag);
-# no fitting code or point list for that fit is in the repository. Against the 16
-# TESS clear-sky pixels: MAE 0.683, bias +0.552 mag; a refit gives 0.0747 and
-# leave-one-out MAE 0.593 (validation/portugal/calibration_loo.json,
-# scripts/fit_calibration.py). Kept unchanged so published spots stay reproducible.
-CALIB_FACTOR = 0.04237
+# Least-squares fit to the TESS clear-sky pixels (scripts/fit_calibration.py,
+# validation/portugal/calibration_loo.json).
+CALIB_FACTOR = 0.07467
 
 # Atmospheric extinction (Portuguese atmosphere, tau_aerosol ~0.15)
 EXTINCTION_RATE = 0.0187  # per km
