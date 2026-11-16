@@ -7,7 +7,7 @@ Satellite-derived dark-sky mapping pipeline: ingests VIIRS VNP46A4 nighttime rad
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![STAC](https://img.shields.io/badge/STAC-compliant-green.svg)](https://stacspec.org/)
 
-3-year VIIRS median (2023-2025) at 500m resolution, scored by a 6-factor SSI combining PSF-predicted SQM, CLAAS-3/ERA5 cloud climatology, vegetation-aware SVF, land cover, slope, and elevation. Checked against 16 TESS photometer pixels (clear-sky moonless zenith): MAE 0.683 mag, bias +0.55 mag with the current calibration; leave-one-out MAE 0.593 mag (see [validation](docs/validation_report.md)). Each spot gets a drivable access point (OSRM car rules + Portuguese traffic code) from a local OpenStreetMap extract.
+3-year VIIRS median (2023-2025) at 500m resolution, scored by a 6-factor SSI combining PSF-predicted SQM, ERA5 hourly cloud climatology, vegetation-aware SVF, land cover, slope, and elevation. Checked against 16 TESS photometer pixels (clear-sky moonless zenith): MAE 0.683 mag, bias +0.55 mag with the current calibration; leave-one-out MAE 0.593 mag (see [validation](docs/validation_report.md)). Each spot gets a drivable access point (OSRM car rules + Portuguese traffic code) from a local OpenStreetMap extract.
 
 ![Dark-Sky Classification](docs/images/portugal_darksky_classification.png)
 
@@ -63,7 +63,7 @@ darksky-observatory/
 | Dataset | Provider | Resolution |
 |---------|----------|-----------|
 | Nighttime Lights | NASA LP DAAC (VNP46A4) | 500m annual |
-| Cloud Climatology | CM SAF CLAAS-3 / ECMWF ERA5 | 5km / 25km |
+| Cloud Climatology | ECMWF ERA5 hourly | 0.25° |
 | Digital Elevation | Copernicus GLO-30 | 30m |
 | Forest Canopy | Hansen GFC | 30m |
 | Land Cover | ESA WorldCover | 10m |
@@ -71,7 +71,7 @@ darksky-observatory/
 
 ## Methodology
 
-PSF skyglow model (Garstang 1986, Duriscoe 2018 softening) predicts clear-sky SQM via FFT convolution over 200km radius. Cloud fraction from CLAAS-3 satellite observations (mainland) or ERA5 reanalysis (islands) restricted to astronomical darkness. SVF computed from DEM + Hansen canopy. Weighted linear combination produces a 0-100 SSI per spot.
+PSF skyglow model (Garstang 1986, Duriscoe 2018 softening) predicts clear-sky SQM via FFT convolution over 200km radius. Clear-night fraction: share of astronomically dark hours (2006-2025) with ERA5 total cloud cover below 0.2. SVF computed from DEM + Hansen canopy. Weighted linear combination produces a 0-100 SSI per spot.
 
 Full methodology: [docs/methodology.md](docs/methodology.md)
 

@@ -80,17 +80,11 @@ B_natural = 0.171 mcd/m^2 (Walker 1988). The model predicts clear-sky potential.
 
 ## 5. Cloud Climatology
 
-| Region | Product | Resolution |
-|--------|---------|-----------|
-| Mainland | CLAAS-3 (CM SAF) | 5 km |
-| Islands | ERA5 reanalysis | 25 km |
-
-Statistics restricted to astronomical darkness (sun < -18 deg). Clear-sky fraction:
+ERA5 hourly total cloud cover (TCC), 0.25°, 2006-2025, all regions. Per grid cell:
 ```
-CKF = mean(1 - TCC) during dark hours
+clear_night_fraction = (dark hours with TCC < 0.2) / (dark hours)
 ```
-
-Decomposed seasonally (DJF, MAM, JJA, SON) for seasonal SSI.
+Dark: Sun altitude < -18° at the cell's latitude and longitude at each hour (NOAA solar position equations; within 0.6° of Skyfield/DE421 in the tests). The 0.2 threshold is a design choice. Bilinear interpolation to the VIIRS grid.
 
 ---
 

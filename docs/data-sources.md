@@ -5,8 +5,7 @@
 | Dataset | Provider | Product | Resolution | Access |
 |---------|----------|---------|-----------|--------|
 | Nighttime Lights | NASA LP DAAC | VNP46A4v001 | 500m annual | Earthdata Login (free) |
-| Cloud (mainland) | CM SAF / EUMETSAT | CLAAS-3 CFC | 5 km | wui.cmsaf.eu (free) |
-| Cloud (islands) | ECMWF / C3S | ERA5 TCC | 0.25 deg | CDS API (free) |
+| Cloud | ECMWF / C3S | ERA5 hourly TCC | 0.25 deg | CDS API (free) |
 | Elevation | ESA / Copernicus | GLO-30 DEM | 30m | AWS S3 (public) |
 | Forest Canopy | U. Maryland | Hansen GFC v1.11 | 30m | GCS (public) |
 | Land Cover | ESA | WorldCover v200 | 10m | AWS S3 (public) |
@@ -34,7 +33,6 @@ landuse = meadow | grass
 | Copernicus DEM | Copernicus Data Policy | Yes |
 | ESA WorldCover | CC-BY 4.0 | Yes |
 | Hansen GFC | CC-BY 4.0 | Yes |
-| CLAAS-3 (CM SAF) | CM SAF data policy | Research only |
 | ERA5 | Copernicus License | Yes |
 | OpenStreetMap | ODbL 1.0 | Yes (share-alike) |
 
@@ -43,7 +41,6 @@ landuse = meadow | grass
 | Dataset | Registration URL |
 |---------|-----------------|
 | VIIRS VNP46A4 | https://urs.earthdata.nasa.gov/ |
-| CLAAS-3 | https://wui.cmsaf.eu |
 | ERA5 | https://cds.climate.copernicus.eu/ |
 
 All other datasets are publicly accessible without authentication. The pipeline fetches them automatically on first run.

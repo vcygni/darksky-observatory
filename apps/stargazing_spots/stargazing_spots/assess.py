@@ -15,7 +15,6 @@ and produces the scientifically-scored, multi-criteria-filtered output.
 
 import logging
 import time
-from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
@@ -56,33 +55,15 @@ def run_full_assessment(
     spots = skyglow_assess(spots, radiance, x_coords, y_coords)
     logger.info("  Done: mean SQM = %.2f", spots["predicted_sqm"].mean())
 
-    # 2. Cloud cover (CLAAS-3 5km satellite or ERA5 25km fallback)
+    # 2. Cloud cover (ERA5 hourly clear-night fraction)
     logger.info("--- [2/7] Cloud cover (clear-night fraction) ---")
     try:
         from stargazing_spots.cloud_cover import (
-            ClearSkyConfig,
             compute_clear_night_fraction,
             resample_to_viirs_grid,
         )
 
-        # Try CLAAS-3 (5km satellite-observed) first, fall back to ERA5 (25km model)
-        claas3_file = (
-            Path(__file__).parent.parent
-            / "input"
-            / "portugal"
-            / "cache"
-            / "claas3_clear_night_mainland.nc"
-        )
-        if claas3_file.exists() and region == "mainland":
-            import xarray as xr
-
-            clear_fraction_era5 = xr.open_dataarray(str(claas3_file))
-            logger.info("  Using CLAAS-3 (5km satellite, 11200 grid cells)")
-        else:
-            config = ClearSkyConfig()
-            clear_fraction_era5 = compute_clear_night_fraction(config=config, region=region)
-            logger.info("  Using ERA5 (25km model reanalysis)")
-
+        clear_fraction_era5 = compute_clear_night_fraction(region=region)
         # Resample ERA5 grid to VIIRS coordinates, then sample at spot locations
         clear_resampled = resample_to_viirs_grid(clear_fraction_era5, x_coords, y_coords)
 

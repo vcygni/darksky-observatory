@@ -36,7 +36,7 @@ darksky-observatory/
 │  STAGE 5-6: SKYGLOW + CLOUD COVER                                        │
 │  skyglow.py + cloud_cover.py                                             │
 │  PSF convolution (FFT) → SQM prediction                                 │
-│  CLAAS-3 (mainland) / ERA5 (islands) → clear-night fraction              │
+│  ERA5 hourly cloud cover → clear-night fraction                          │
 └───────────────────────────────────────┬─────────────────────────────────┘
                                         │
 ┌───────────────────────────────────────▼─────────────────────────────────┐
@@ -72,7 +72,7 @@ darksky-observatory/
 | `enrichment` | OSM feature download and filtering |
 | `enrichment_raster` | Raster-native pixel sampling of OSM features |
 | `skyglow` | PSF convolution (FFT), SQM prediction, Bortle classification |
-| `cloud_cover` | CLAAS-3 / ERA5 clear-night fraction |
+| `cloud_cover` | ERA5 hourly clear-night fraction |
 | `sky_view` | Vegetation-aware SVF (DEM + Hansen) |
 | `land_cover` | WorldCover + Hansen probabilistic scoring |
 | `accessibility` | DEM slope |

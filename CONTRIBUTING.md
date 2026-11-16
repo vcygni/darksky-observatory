@@ -36,7 +36,7 @@ cp apps/stargazing_spots/.env.example apps/stargazing_spots/.env
 
 1. VIIRS: set `EARTHDATA_TOKEN`, pipeline downloads and caches (~50 MB, 5-10 min).
 2. OpenStreetMap: `make download-osm`, then `make boundary` (Portugal land boundary from the extract).
-4. CLAAS-3 (optional): register at wui.cmsaf.eu, order CFC monthly product, place in `input/portugal/cache/claas3/`.
+3. ERA5: set `CDS_API_KEY`; hourly cloud cover 2006-2025 is downloaded per region and year on first run.
 
 ## Running the Pipeline
 
