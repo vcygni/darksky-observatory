@@ -19,7 +19,7 @@ keywords = [
 dependencies = [
     "blackmarblepy>=2025.0",
     "geopandas>=1.0",
-    "xarray>=2024.1",
+    "xarray>=2026.9",  # zarr v3 metadata (Earth Data Hub)
     "rasterio>=1.4",
     "osmnx>=1.9",
     "pystac>=1.10",
@@ -31,10 +31,11 @@ dependencies = [
     "pyarrow>=14.0",
     "python-dotenv>=1.0",
     "netcdf4>=1.6",
-    "cdsapi>=0.7",
     "gcsfs>=2024.1",
     "dask>=2024.1",
-    "zarr>=2.0",
+    "zarr>=3.0",
+    "fsspec>=2024.6",
+    "aiohttp>=3.9",
     "osmium>=4.0",
 ]
 

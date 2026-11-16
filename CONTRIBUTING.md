@@ -26,7 +26,7 @@ cp apps/stargazing_spots/.env.example apps/stargazing_spots/.env
 | Variable | Source | Purpose |
 |----------|--------|---------|
 | `EARTHDATA_TOKEN` | [urs.earthdata.nasa.gov](https://urs.earthdata.nasa.gov/) | VIIRS data |
-| `CDS_API_KEY` | [cds.climate.copernicus.eu](https://cds.climate.copernicus.eu/) | ERA5 cloud |
+| `EDH_TOKEN` | [earthdatahub.destine.eu](https://earthdatahub.destine.eu/) | ERA5 cloud cover |
 
 ## Data Acquisition
 
@@ -36,7 +36,7 @@ cp apps/stargazing_spots/.env.example apps/stargazing_spots/.env
 
 1. VIIRS: set `EARTHDATA_TOKEN`, pipeline downloads and caches (~50 MB, 5-10 min).
 2. OpenStreetMap: `make download-osm`, then `make boundary` (Portugal land boundary from the extract).
-3. ERA5: set `CDS_API_KEY`; hourly cloud cover 2006-2025 is downloaded per region and year on first run.
+3. ERA5: set `EDH_TOKEN`; hourly cloud cover 2006-2025 is read from the Earth Data Hub on first run and the result cached.
 
 ## Running the Pipeline
 

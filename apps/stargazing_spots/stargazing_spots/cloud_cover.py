@@ -7,6 +7,9 @@ For each ERA5 grid cell (0.25 deg), 2006-2025:
 An hour is dark when the Sun is below -18 deg (astronomical night) at the
 cell's own latitude and longitude at that timestamp. The same definition is
 used for mainland Portugal, Madeira and the Azores.
+
+ERA5 is read from the Destination Earth Earth Data Hub (Zarr, CC BY 4.0),
+which needs an API key in $EDH_TOKEN.
 """
 
 import logging
@@ -19,7 +22,9 @@ import xarray as xr
 
 logger = logging.getLogger(__name__)
 
-CDS_DATASET = "reanalysis-era5-single-levels"
+EDH_URL = (
+    "https://edh:{token}@api.earthdatahub.destine.eu/era5/era5-single-levels-atmosphere-v0.zarr"
+)
 
 # Design choice: an hour counts as clear when total cloud cover is below 20 %.
 CLEAR_THRESHOLD = 0.2
@@ -27,12 +32,12 @@ ASTRONOMICAL_NIGHT_DEG = -18.0
 
 CLIM_START_YEAR = 2006
 CLIM_END_YEAR = 2025
-
 REGION_BOUNDS = {
     "mainland": {"lat": (36.5, 42.5), "lon": (-10.0, -6.0)},
     "madeira": {"lat": (32.0, 34.0), "lon": (-17.5, -16.0)},
     "azores": {"lat": (36.5, 40.0), "lon": (-32.0, -25.0)},
 }
+TIME_CHUNK = 2000  # hours processed at once (bounds memory)
 
 
 @dataclass
@@ -95,44 +100,12 @@ def clear_dark_counts(
     return clear.sum(axis=0), dark.sum(axis=0)
 
 
-def _get_cds_client():
-    """CDS API client from $CDS_API_KEY, else ~/.cdsapirc."""
-    import cdsapi
-
-    key = os.environ.get("CDS_API_KEY")
-    if key:
-        return cdsapi.Client(url="https://cds.climate.copernicus.eu/api", key=key)
-    return cdsapi.Client()
-
-
-def _hourly_file(config: ClearSkyConfig, region: str, year: int) -> Path:
-    return config.cache_dir / f"era5_tcc_hourly_{region}_{year}.nc"
-
-
-def download_era5_hourly(config: ClearSkyConfig, region: str, year: int) -> Path:
-    """Hourly ERA5 total cloud cover for one region and year (cached)."""
-    path = _hourly_file(config, region, year)
-    if path.exists():
-        return path
-    b = REGION_BOUNDS[region]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    logger.info("ERA5 hourly TCC %s %d: requesting from CDS", region, year)
-    _get_cds_client().retrieve(
-        CDS_DATASET,
-        {
-            "product_type": ["reanalysis"],
-            "variable": ["total_cloud_cover"],
-            "year": [str(year)],
-            "month": [f"{m:02d}" for m in range(1, 13)],
-            "day": [f"{d:02d}" for d in range(1, 32)],
-            "time": [f"{h:02d}:00" for h in range(24)],
-            "area": [b["lat"][1], b["lon"][0], b["lat"][0], b["lon"][1]],
-            "data_format": "netcdf",
-            "download_format": "unarchived",
-        },
-        str(path),
-    )
-    return path
+def open_era5_tcc() -> xr.DataArray:
+    """Lazy ERA5 hourly total cloud cover from the Earth Data Hub (longitude 0-360)."""
+    token = os.environ.get("EDH_TOKEN")
+    if not token:
+        raise RuntimeError("EDH_TOKEN is not set (Earth Data Hub API key)")
+    return xr.open_dataset(EDH_URL.format(token=token), engine="zarr", chunks={})["tcc"]
 
 
 def compute_clear_night_fraction(
@@ -153,17 +126,29 @@ def compute_clear_night_fraction(
         logger.info("Loading cached clear-night fraction: %s", cache_file.name)
         return xr.open_dataarray(cache_file)
 
-    clear_total = dark_total = lat = lon = None
+    b = REGION_BOUNDS[region]
+    tcc = (
+        open_era5_tcc()
+        .sel(
+            latitude=slice(b["lat"][1], b["lat"][0]),
+            longitude=slice(b["lon"][0] % 360, b["lon"][1] % 360),
+        )
+        .transpose("valid_time", "latitude", "longitude")
+    )
+    lat = tcc["latitude"].values
+    lon = (tcc["longitude"].values + 180) % 360 - 180  # back to -180..180
+    clear_total = dark_total = None
     for year in range(config.start_year, config.end_year + 1):
-        with xr.open_dataset(download_era5_hourly(config, region, year)) as ds:
-            time_dim = "valid_time" if "valid_time" in ds.dims else "time"
-            tcc = ds["tcc"].transpose(time_dim, "latitude", "longitude")
-            lat, lon = ds["latitude"].values, ds["longitude"].values
+        yearly = tcc.sel(valid_time=slice(f"{year}-01-01", f"{year}-12-31T23"))
+        times = yearly["valid_time"].values
+        logger.info("ERA5 TCC %s %d: %d hours", region, year, len(times))
+        for start in range(0, len(times), TIME_CHUNK):
+            part = slice(start, start + TIME_CHUNK)
             clear, dark = clear_dark_counts(
-                tcc.values, ds[time_dim].values, lat, lon, config.clear_threshold
+                yearly[part].values, times[part], lat, lon, config.clear_threshold
             )
-        clear_total = clear if clear_total is None else clear_total + clear
-        dark_total = dark if dark_total is None else dark_total + dark
+            clear_total = clear if clear_total is None else clear_total + clear
+            dark_total = dark if dark_total is None else dark_total + dark
 
     with np.errstate(divide="ignore", invalid="ignore"):
         fraction = np.where(dark_total > 0, clear_total / dark_total, np.nan)
@@ -180,7 +165,7 @@ def compute_clear_night_fraction(
                 f" < {config.clear_threshold:g}, divided by dark hours"
             ),
             "period": f"{config.start_year}-{config.end_year}",
-            "source": "ERA5 hourly single levels, total_cloud_cover (Copernicus CDS)",
+            "source": "ERA5 hourly single levels, tcc (Earth Data Hub, CC BY 4.0)",
         },
     )
     config.cache_dir.mkdir(parents=True, exist_ok=True)

@@ -19,7 +19,7 @@ cd darksky-observatory
 make install
 make test            # 120 tests, no data needed
 cp apps/stargazing_spots/.env.example apps/stargazing_spots/.env
-# Add EARTHDATA_TOKEN + CDS_API_KEY
+# Add EARTHDATA_TOKEN + EDH_TOKEN
 make download-data   # ~2GB terrain tiles
 make download-osm    # ~425MB OpenStreetMap extract (candidates + access points)
 make run             # ~36s with local data
