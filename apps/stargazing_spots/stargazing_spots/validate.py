@@ -21,6 +21,7 @@ to the edge pixel). No MAE is pooled across heterogeneous sources.
 
 import json
 import logging
+import os
 from pathlib import Path
 
 import geopandas as gpd
@@ -31,7 +32,25 @@ from shapely import wkt
 
 logger = logging.getLogger(__name__)
 
-VALIDATION_DIR = Path(__file__).resolve().parents[3] / "validation" / "portugal"
+def _find_validation_dir() -> Path:
+    """Locate validation/portugal: $VALIDATION_DIR, else the nearest parent that has it.
+
+    The repo layout puts it three levels above this file; in the Docker image it
+    is mounted at /app/validation, one level up. A fixed ``parents[3]`` raised
+    IndexError inside the container.
+    """
+    env = os.getenv("VALIDATION_DIR")
+    if env:
+        return Path(env)
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "validation" / "portugal"
+        if candidate.is_dir():
+            return candidate
+    return here.parent / "validation" / "portugal"  # not found; loaders report missing files
+
+
+VALIDATION_DIR = _find_validation_dir()
 
 
 # --- Loading ------------------------------------------------------------------

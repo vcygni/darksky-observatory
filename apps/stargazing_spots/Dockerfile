@@ -1,3 +1,4 @@
+
 FROM python:3.12-slim AS base
 
 # System deps for GDAL/rasterio/geopandas
@@ -10,20 +11,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install uv for fast dependency resolution
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Install uv for fast dependency resolution (pinned for reproducible builds)
+COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /usr/local/bin/uv
 
-# Copy dependency file first (Docker cache layer)
+# hatchling needs the package source to build, so copy it before installing
 COPY pyproject.toml .
-
-# Install Python dependencies
+COPY stargazing_spots/ stargazing_spots/
 RUN uv pip install --system --no-cache .
 
-# Copy source
-COPY stargazing_spots/ stargazing_spots/
-
-# Create data directories
-RUN mkdir -p input/portugal/{cache,boundary,osm} \
-             output/portugal/{mainland,madeira,azores,visualizations}
+# Create data directories (/bin/sh has no brace expansion)
+RUN mkdir -p input/portugal/cache input/portugal/boundary input/portugal/osm \
+             output/portugal/mainland output/portugal/madeira output/portugal/azores \
+             output/portugal/visualizations
 
 ENTRYPOINT ["python", "-m", "stargazing_spots"]
+
+# Test image: adds the dev extra (pytest) and the test suite
+FROM base AS test
+RUN uv pip install --system --no-cache ".[dev]"
+COPY tests/ tests/
+ENTRYPOINT []
+CMD ["python", "-m", "pytest", "tests/", "-v"]

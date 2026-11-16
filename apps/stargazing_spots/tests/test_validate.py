@@ -54,3 +54,14 @@ def test_repository_audit_covers_every_measured_site():
     published = v._load_published_sites()
     assert published is not None
     assert set(published["use"]) <= {"primary", "indicative", "excluded"}
+
+
+def test_validation_dir_env_override(monkeypatch, tmp_path):
+    monkeypatch.setenv("VALIDATION_DIR", str(tmp_path))
+    assert v._find_validation_dir() == tmp_path
+
+
+def test_validation_dir_found_in_repo_layout(monkeypatch):
+    monkeypatch.delenv("VALIDATION_DIR", raising=False)
+    found = v._find_validation_dir()
+    assert found.is_dir() and found.parts[-2:] == ("validation", "portugal")

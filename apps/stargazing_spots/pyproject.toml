@@ -3,7 +3,7 @@ name = "stargazing-spots"
 version = "0.7.0"
 description = "Earth Observation pipeline for dark-sky site identification using NASA VIIRS VNP46A4 nighttime radiance"
 readme = {text = "Earth Observation pipeline for dark-sky site identification", content-type = "text/plain"}
-license = "MIT"
+license = "Apache-2.0"
 requires-python = ">=3.11"
 authors = [{ name = "AstroTraveler" }]
 keywords = [

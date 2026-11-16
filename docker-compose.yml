@@ -3,17 +3,17 @@ services:
     build:
       context: ./apps/stargazing_spots
       dockerfile: Dockerfile
+      target: base
     env_file: ./apps/stargazing_spots/.env
     volumes:
       - ./apps/stargazing_spots/input:/app/input
       - ./apps/stargazing_spots/output:/app/output
       - ./validation:/app/validation
-    command: python -m stargazing_spots --all-regions --from-geojson input/portugal/osm/osm_features_portugal.geojson
+    # Same arguments as `make run`; candidates come from the local OSM extract
+    command: --all-regions --output-dir output/portugal --threshold 3.0
 
   stargazing-spots-test:
     build:
       context: ./apps/stargazing_spots
       dockerfile: Dockerfile
-    command: python -m pytest tests/ -v
-    volumes:
-      - ./apps/stargazing_spots/tests:/app/tests
+      target: test
