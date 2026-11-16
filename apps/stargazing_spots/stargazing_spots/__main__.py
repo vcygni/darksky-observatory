@@ -300,7 +300,7 @@ def run_pipeline(
 
         scored = run_full_assessment(scored, full_radiance, x_coords, y_coords, region=region)
 
-        # Filter physically unsuitable spots (forest, water, etc.)
+        # Filter physically unsuitable spots, then keep the upper SSI class of the region
         n_before_filter = len(scored)
         scored = filter_unsuitable(scored)
         n_filtered = n_before_filter - len(scored)

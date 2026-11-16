@@ -200,6 +200,33 @@ DENSITY_CELL_DEG = 0.25  # product choice: ~25 km cells
 DENSITY_MAX_PER_CELL = 5
 
 
+def two_class_split(values) -> float:
+    """Threshold that splits ``values`` into two classes with maximum between-class
+    variance (Otsu 1979; equivalent to a two-class Jenks natural-breaks split).
+    Returns the midpoint between the last value of the lower class and the first
+    of the upper class.
+    """
+    v = np.sort(np.asarray(values, dtype=float))
+    v = v[~np.isnan(v)]
+    n = len(v)
+    if n < 2 or v[0] == v[-1]:
+        return float(v[0]) if n else float("nan")
+    k = np.arange(1, n)
+    csum = np.cumsum(v)
+    m0 = csum[:-1] / k
+    m1 = (csum[-1] - csum[:-1]) / (n - k)
+    between = (k / n) * ((n - k) / n) * (m0 - m1) ** 2
+    between[v[1:] == v[:-1]] = -1  # a split must fall between distinct values
+    i = int(np.argmax(between))
+    return float((v[i] + v[i + 1]) / 2)
+
+
+def ssi_percentile(values, reference) -> np.ndarray:
+    """Share of ``reference`` SSI values that are <= each value (0-1)."""
+    ref = np.sort(np.asarray(reference, dtype=float))
+    return np.searchsorted(ref, np.asarray(values, dtype=float), side="right") / max(len(ref), 1)
+
+
 def _rank_order(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """Best first: SSI descending, ties broken by OSM id, so results never depend on input order."""
     tiebreak = spots["id"].astype(str) if "id" in spots.columns else spots.index.astype(str)
@@ -258,19 +285,8 @@ def thin_spatially(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return ranked
 
 
-def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Remove spots that are physically unsuitable for stargazing.
-
-    Uses vegetation-aware SVF as the primary sky-visibility filter instead
-    of binary land cover classification.
-
-    Args:
-        spots: GeoDataFrame with assessment columns.
-
-    Returns:
-        Filtered GeoDataFrame with unsuitable spots removed.
-    """
-    n_initial = len(spots)
+def filter_physical(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Remove obstructed (SVF), urban/water and night-restricted candidates."""
 
     # Primary filter: SVF >= 0.7 (design choice)
     if "sky_view_factor" in spots.columns:
@@ -295,15 +311,34 @@ def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         spots = spots[~restricted]
         if n_restricted > 0:
             logger.info("  Removed %d spots (access=private/no, barrier=gate)", n_restricted)
+    return spots
 
-    # Filter: SSI floor — keep only good and excellent stargazing locations
-    # SSI < 65 = marginal/acceptable/poor → not worth recommending
-    if "ssi_score" in spots.columns:
-        too_low = spots["ssi_score"] < 65
-        n_low = too_low.sum()
+
+def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Physical filters, then keep the upper class of a two-class SSI split.
+
+    The split is computed on the physically suitable candidates passed in
+    (one region per call), so each region is ranked against its own climate.
+    Keeping the upper class is a design choice.
+
+    Args:
+        spots: GeoDataFrame with assessment columns (one region).
+
+    Returns:
+        Filtered, tiered and spatially thinned GeoDataFrame.
+    """
+    n_initial = len(spots)
+    spots = filter_physical(spots)
+
+    if "ssi_score" in spots.columns and len(spots) > 0:
+        split = two_class_split(spots["ssi_score"])
+        spots = spots.assign(
+            ssi_percentile=np.round(ssi_percentile(spots["ssi_score"], spots["ssi_score"]), 3)
+        )
+        too_low = ~(spots["ssi_score"] >= split)  # also drops missing SSI
+        n_low = int(too_low.sum())
         spots = spots[~too_low]
-        if n_low > 0:
-            logger.info("  Removed %d spots (SSI < 65: not good/excellent)", n_low)
+        logger.info("  Removed %d spots (SSI < %.1f, two-class split)", n_low, split)
 
     n_final = len(spots)
     logger.info(

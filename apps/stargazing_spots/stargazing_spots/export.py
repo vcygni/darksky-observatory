@@ -54,6 +54,7 @@ def to_geojson(
         "predicted_bortle",
         "predicted_brightness_mcd",
         "ssi_score",
+        "ssi_percentile",
         "ssi_class",
         "clear_night_fraction",
         "sky_view_factor",
