@@ -1,14 +1,73 @@
 [project]
 name = "darksky-observatory"
 version = "0.7.0"
-description = "Satellite-derived dark-sky mapping and stargazing site identification"
-requires-python = ">=3.11"
+description = "Satellite-derived dark-sky mapping and stargazing site ranking"
+requires-python = ">=3.12"
 
 [tool.uv.workspace]
 members = ["apps/stargazing_spots"]
 
 [dependency-groups]
 dev = [
-    "pytest>=7.0",
-    "ruff>=0.1.0",
+    "mypy>=1.18",
+    "nbstripout>=0.9",
+    "pandas-stubs>=2.2",
+    "pytest>=9.0",
+    "ruff>=0.15",
+    "scipy-stubs>=1.16",
+    "skyfield>=1.55", # scripts/derive_tess_clear_sky.py
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["apps/stargazing_spots/input", "apps/stargazing_spots/output"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812",  # conflicts with the formatter
+    "D100", "D101", "D102", "D103", "D104", "D105", "D107",  # docstrings only where they add information
+    "EM101", "EM102", "TRY003",  # exception messages written inline
+    "FBT001", "FBT002",  # boolean options in dataclasses and CLI flags
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [  # frozen dataclasses used as defaults
+    "stargazing_spots.cloud_cover.ClearSkyConfig",
+    "stargazing_spots.skyglow.PropagationConfig",
+    "stargazing_spots.suitability.SSIWeights",
+    "stargazing_spots.uncertainty.ConfidenceWeights",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["stargazing_spots"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 7
+
+[tool.ruff.lint.per-file-ignores]
+"apps/stargazing_spots/tests/**" = ["S101", "PLR2004", "ANN", "INP001"]
+"scripts/**" = ["T201", "INP001"]
+"notebooks/**" = ["T201", "ANN", "PLR2004", "D", "E402", "E501", "ERA001", "INP001", "S101", "FBT003", "PD013"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+files = ["apps/stargazing_spots/stargazing_spots", "scripts"]
+
+[[tool.mypy.overrides]]
+module = ["blackmarble.*", "geopandas.*", "joblib.*", "osmium.*", "pystac.*", "rasterio.*", "shapely.*", "skyfield.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["apps/stargazing_spots/tests"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+xfail_strict = true
+filterwarnings = ["error"]
+log_level = "INFO"

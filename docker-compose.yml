@@ -9,8 +9,6 @@ services:
       - ./apps/stargazing_spots/input:/app/input
       - ./apps/stargazing_spots/output:/app/output
       - ./validation:/app/validation
-    # Same arguments as `make run`; candidates come from the local OSM extract
-    command: --all-regions --output-dir output/portugal --threshold 3.0
 
   stargazing-spots-test:
     build:

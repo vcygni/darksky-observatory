@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI
 
 on:
   push:
@@ -7,45 +7,20 @@ on:
     branches: [main]
 
 jobs:
-  lint-and-test:
+  check:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
-
+        python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v7
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.3.3  # no major tags since v8
+      - uses: astral-sh/setup-uv@v10.3.3  # no major tags since v8
         with:
           version: "0.11.7"
-
-      - name: Cache uv
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/uv
-          key: ${{ runner.os }}-uv-${{ hashFiles('apps/stargazing_spots/pyproject.toml') }}
-
-      - name: Install GDAL system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gdal-bin libgdal-dev
-
-      - name: Install pipeline
-        run: |
-          uv sync --all-packages
-
-      - name: Lint with ruff
-        run: |
-          uv run ruff check apps/stargazing_spots/ scripts/ notebooks/
-          uv run ruff format --check apps/stargazing_spots/ scripts/
-
-      - name: Run tests
-        run: |
-          uv run python -m pytest apps/stargazing_spots/tests/ -v
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - run: uv sync --all-packages --locked
+      - run: uv run ruff check apps/stargazing_spots scripts notebooks
+      - run: uv run ruff format --check apps/stargazing_spots scripts notebooks
+      - run: uv run mypy
+      - run: uv run pytest

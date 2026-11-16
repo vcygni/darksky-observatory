@@ -1,15 +1,18 @@
-.PHONY: install test lint run access-points download-osm boundary validate clean docker-build docker-run
+.PHONY: install download-viirs download-data download-osm boundary run access-points validate calibrate test lint format docker-build docker-run docker-test clean
 
-# === Setup ===
+APP = apps/stargazing_spots
+OSM_PBF_URL = https://download.geofabrik.de/europe/portugal-latest.osm.pbf
+OSM_DIR = $(APP)/input/portugal/osm
+
 install:
-	uv sync --all-packages  # root dev group + every workspace member and its dev group
+	uv sync --all-packages
+
+# Input data
+download-viirs:
+	uv run python scripts/download_viirs.py
 
 download-data:
-	cd apps/stargazing_spots && uv run python scripts/download_terrain_data.py
-
-# OpenStreetMap extract for drivable access points (~425 MB, Geofabrik, updated daily)
-OSM_PBF_URL = https://download.geofabrik.de/europe/portugal-latest.osm.pbf
-OSM_DIR = apps/stargazing_spots/input/portugal/osm
+	uv run python scripts/download_terrain.py
 
 download-osm:
 	curl -fSL -o $(OSM_DIR)/portugal-latest.osm.pbf.part $(OSM_PBF_URL)
@@ -17,39 +20,37 @@ download-osm:
 		| (cd $(OSM_DIR) && md5sum -c -)
 	mv $(OSM_DIR)/portugal-latest.osm.pbf.part $(OSM_DIR)/portugal-latest.osm.pbf
 
-# Portugal land boundary from the OSM extract (municipality union)
 boundary:
-	cd apps/stargazing_spots && uv run python ../../scripts/build_boundary.py
+	uv run python scripts/build_boundary.py
 
-# === Development ===
-test:
-	uv run python -m pytest apps/stargazing_spots/tests/ -v
-
-lint:
-	uv run ruff check apps/stargazing_spots/ scripts/ notebooks/
-	uv run ruff format --check apps/stargazing_spots/ scripts/
-
-format:
-	uv run ruff format apps/stargazing_spots/ scripts/
-
-# === Pipeline ===
+# Pipeline
 run:
-	cd apps/stargazing_spots && uv run python -m stargazing_spots \
-		--all-regions \
-		--output-dir output/portugal \
-		--threshold 3.0
+	uv run python -m stargazing_spots
 
-# Re-run only the access-point step on existing output (no satellite processing)
 access-points:
-	cd apps/stargazing_spots && uv run python -m stargazing_spots.access_points \
-		output/portugal/spots_all.geojson
+	uv run python -m stargazing_spots.access_points $(APP)/output/portugal/spots_all.geojson
 
 validate:
-	cd apps/stargazing_spots && uv run python ../../scripts/run_validation.py
+	uv run python scripts/run_validation.py
 
-# === Docker ===
+calibrate:
+	uv run python scripts/fit_calibration.py
+
+# Development
+test:
+	uv run pytest $(APP)/tests
+
+lint:
+	uv run ruff check $(APP) scripts notebooks
+	uv run ruff format --check $(APP) scripts notebooks
+	uv run mypy
+
+format:
+	uv run ruff check --fix $(APP) scripts notebooks
+	uv run ruff format $(APP) scripts notebooks
+
 docker-build:
-	docker compose build stargazing-spots
+	docker compose build
 
 docker-run:
 	docker compose run --rm stargazing-spots
@@ -57,8 +58,5 @@ docker-run:
 docker-test:
 	docker compose run --rm stargazing-spots-test
 
-# === Cleanup ===
 clean:
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
-	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
-	find . -name "*.pyc" -delete 2>/dev/null || true
+	find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name .mypy_cache \) -prune -exec rm -rf {} +
