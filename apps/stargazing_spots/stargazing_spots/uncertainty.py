@@ -28,7 +28,9 @@ class ConfidenceWeights:
             raise ValueError(f"Weights must sum to 1.0, got {total}")
 
 
-def _sigmoid_distance_score(radiance: np.ndarray, threshold: float, steepness: float = 2.0) -> np.ndarray:
+def _sigmoid_distance_score(
+    radiance: np.ndarray, threshold: float, steepness: float = 2.0
+) -> np.ndarray:
     """Compute distance-from-threshold confidence using a sigmoid curve.
 
     Pixels well below threshold → score near 1.0
@@ -172,7 +174,10 @@ def compute_confidence_layer(
         logger.info("Confidence layer computed:")
         logger.info("  Mean confidence: %.1f%%", np.mean(valid_confidence))
         logger.info("  High (>75%%): %d pixels", np.sum(valid_confidence > 75))
-        logger.info("  Medium (50-75%%): %d pixels", np.sum((valid_confidence >= 50) & (valid_confidence <= 75)))
+        logger.info(
+            "  Medium (50-75%%): %d pixels",
+            np.sum((valid_confidence >= 50) & (valid_confidence <= 75)),
+        )
         logger.info("  Low (<50%%): %d pixels", np.sum(valid_confidence < 50))
 
     return result

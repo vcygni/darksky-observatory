@@ -9,10 +9,9 @@ After download, the pipeline reads locally — zero network calls during runs.
 Run once: `uv run python scripts/download_terrain_data.py`
 """
 
-import os
 import urllib.request
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 # Output directories
 BASE = Path(__file__).parent.parent
@@ -84,8 +83,9 @@ def download_copernicus_dem():
     print(f"  Tiles needed: {len(downloads)}")
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(download_file, url, path, desc): desc
-                   for url, path, desc in downloads}
+        futures = {
+            executor.submit(download_file, url, path, desc): desc for url, path, desc in downloads
+        }
         for future in as_completed(futures):
             future.result()
 
@@ -98,12 +98,19 @@ def download_worldcover():
 
     # Tiles are 3°×3° blocks by SW corner
     tiles = [
-        ("N36", "W012"), ("N36", "W009"), ("N36", "W006"),  # Mainland south
-        ("N39", "W012"), ("N39", "W009"), ("N39", "W006"),  # Mainland north
-        ("N42", "W012"), ("N42", "W009"),                    # Far north
-        ("N30", "W018"),                                      # Madeira
-        ("N36", "W027"), ("N36", "W030"),                    # Azores
-        ("N39", "W030"), ("N39", "W027"),                    # Azores north
+        ("N36", "W012"),
+        ("N36", "W009"),
+        ("N36", "W006"),  # Mainland south
+        ("N39", "W012"),
+        ("N39", "W009"),
+        ("N39", "W006"),  # Mainland north
+        ("N42", "W012"),
+        ("N42", "W009"),  # Far north
+        ("N30", "W018"),  # Madeira
+        ("N36", "W027"),
+        ("N36", "W030"),  # Azores
+        ("N39", "W030"),
+        ("N39", "W027"),  # Azores north
     ]
 
     downloads = []
@@ -116,8 +123,9 @@ def download_worldcover():
     print(f"  Tiles needed: {len(downloads)}")
 
     with ThreadPoolExecutor(max_workers=4) as executor:
-        futures = {executor.submit(download_file, url, path, desc): desc
-                   for url, path, desc in downloads}
+        futures = {
+            executor.submit(download_file, url, path, desc): desc for url, path, desc in downloads
+        }
         for future in as_completed(futures):
             future.result()
 
@@ -147,8 +155,9 @@ def download_hansen():
     print(f"  Tiles needed: {len(downloads)}")
 
     with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {executor.submit(download_file, url, path, desc): desc
-                   for url, path, desc in downloads}
+        futures = {
+            executor.submit(download_file, url, path, desc): desc for url, path, desc in downloads
+        }
         for future in as_completed(futures):
             future.result()
 
@@ -156,7 +165,7 @@ def download_hansen():
 if __name__ == "__main__":
     print("=== Downloading terrain data for Portugal ===")
     print(f"Output: {BASE / 'input' / 'portugal'}")
-    print(f"Expected total size: ~3.4 GB")
+    print("Expected total size: ~3.4 GB")
     print()
 
     download_copernicus_dem()
@@ -169,7 +178,7 @@ if __name__ == "__main__":
         if d.exists():
             size = sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
             total_size += size
-            print(f"\n  {d.name}: {size/1e9:.1f} GB ({len(list(d.rglob('*.tif')))} tiles)")
+            print(f"\n  {d.name}: {size / 1e9:.1f} GB ({len(list(d.rglob('*.tif')))} tiles)")
 
-    print(f"\n=== TOTAL: {total_size/1e9:.1f} GB ===")
+    print(f"\n=== TOTAL: {total_size / 1e9:.1f} GB ===")
     print("Done! Pipeline will now read locally — no network calls during runs.")

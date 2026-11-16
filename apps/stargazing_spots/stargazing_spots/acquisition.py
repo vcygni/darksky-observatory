@@ -171,11 +171,13 @@ def parse_h5_tiles(h5_glob_pattern: str) -> pd.DataFrame:
                 continue
 
             lon_2d, lat_2d = np.meshgrid(lon_1d, lat_1d)
-            tile_df = pd.DataFrame({
-                "latitude": lat_2d.ravel(),
-                "longitude": lon_2d.ravel(),
-                "radiance": radiance.ravel(),
-            }).dropna(subset=["radiance"])
+            tile_df = pd.DataFrame(
+                {
+                    "latitude": lat_2d.ravel(),
+                    "longitude": lon_2d.ravel(),
+                    "radiance": radiance.ravel(),
+                }
+            ).dropna(subset=["radiance"])
 
             match = date_pattern.search(filepath)
             if match:

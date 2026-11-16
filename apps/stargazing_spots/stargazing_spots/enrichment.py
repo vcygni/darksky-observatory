@@ -16,7 +16,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_OSM_TAGS = {
     "leisure": ["nature_reserve", "picnic_site"],
     "tourism": ["camp_site", "viewpoint", "picnic_site", "wilderness_hut"],
-    "natural": ["peak", "hill", "ridge", "saddle", "heath", "grassland", "bare_rock", "scree", "cliff"],
+    "natural": [
+        "peak",
+        "hill",
+        "ridge",
+        "saddle",
+        "heath",
+        "grassland",
+        "bare_rock",
+        "scree",
+        "cliff",
+    ],
     "landuse": ["meadow", "grass"],
     "man_made": ["observatory"],
     "amenity": ["shelter"],
@@ -24,7 +34,18 @@ DEFAULT_OSM_TAGS = {
 
 # Relevance filters applied AFTER download
 RELEVANCE_FILTERS = {
-    "natural": ["peak", "hill", "ridge", "saddle", "heath", "grassland", "bare_rock", "scree", "cliff", None],
+    "natural": [
+        "peak",
+        "hill",
+        "ridge",
+        "saddle",
+        "heath",
+        "grassland",
+        "bare_rock",
+        "scree",
+        "cliff",
+        None,
+    ],
     "landuse": ["meadow", "grass", "recreation_ground", "greenfield", "village_green", None],
     "leisure": ["nature_reserve", "picnic_table", None],
     "tourism": ["viewpoint", "picnic_site", "camp_site", "wilderness_hut", None],
@@ -42,9 +63,7 @@ EXCLUSION_TAGS = {
 }
 
 
-def fetch_osm_features(
-    place_name: str, tags: dict | None = None
-) -> gpd.GeoDataFrame:
+def fetch_osm_features(place_name: str, tags: dict | None = None) -> gpd.GeoDataFrame:
     """Download OpenStreetMap features for a named place."""
     if tags is None:
         tags = DEFAULT_OSM_TAGS
@@ -91,7 +110,9 @@ def filter_relevant_features(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     filtered = included[~exclusion_mask]
     n_excluded_total = len(included) - len(filtered)
     if n_excluded_total > 0:
-        logger.info("Exclusion filter: removed %d features (lit, private, forest, water).", n_excluded_total)
+        logger.info(
+            "Exclusion filter: removed %d features (lit, private, forest, water).", n_excluded_total
+        )
     logger.info("Final: %d stargazing-relevant features.", len(filtered))
 
     return filtered
@@ -223,8 +244,12 @@ def enrich_with_temporal(
 
     logger.info("Temporal enrichment complete:")
     logger.info("  Stability: %d high, %d medium, %d low", high, medium, low)
-    logger.info("  Trend: %d stable, %d brightening, %d darkening",
-                len(spots) - brightening - darkening, brightening, darkening)
+    logger.info(
+        "  Trend: %d stable, %d brightening, %d darkening",
+        len(spots) - brightening - darkening,
+        brightening,
+        darkening,
+    )
     logger.info("  Dark all %d years: %d spots", n_years, (spots["years_dark"] == n_years).sum())
 
     return spots

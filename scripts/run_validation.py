@@ -27,18 +27,25 @@ from stargazing_spots.validate import run_validation, save_validation_report  # 
 
 
 def main() -> None:
-    years = [joblib.load(APP / f"input/portugal/cache/VNP46A4_{y}.joblib") for y in ("2023", "2024", "2025")]
+    years = [
+        joblib.load(APP / f"input/portugal/cache/VNP46A4_{y}.joblib")
+        for y in ("2023", "2024", "2025")
+    ]
     radiance = np.nanmedian(
         np.stack([d["NearNadir_Composite_Snow_Free"].values[0] for d in years]), axis=0
     )
     x = years[0].coords["x"].values
     y = years[0].coords["y"].values
-    sky = compute_sky_brightness(np.where(radiance < 0, np.nan, radiance), PropagationConfig())
+    sky = compute_sky_brightness(
+        np.where(radiance < 0, np.nan, radiance), PropagationConfig()
+    )
     sqm = brightness_to_sqm(sky)
     spots = gpd.read_file(APP / "output/portugal/spots_all.geojson")
     report = run_validation(sqm, x, y, spots)
     save_validation_report(report, APP / "output/portugal/validation_report.json")
-    print(f"Baseline ({report['baseline']['metric']}): {report['baseline']['value']} mag")
+    print(
+        f"Baseline ({report['baseline']['metric']}): {report['baseline']['value']} mag"
+    )
 
 
 if __name__ == "__main__":

@@ -204,7 +204,9 @@ def run_change_detection(
         }
 
         logger.info("  %s:", label)
-        logger.info("    Brightening: %d px (%.1f%%)", stats.brightening_pixels, stats.brightening_pct)
+        logger.info(
+            "    Brightening: %d px (%.1f%%)", stats.brightening_pixels, stats.brightening_pct
+        )
         logger.info("    Stable:      %d px (%.1f%%)", stats.stable_pixels, stats.stable_pct)
         logger.info("    Darkening:   %d px (%.1f%%)", stats.darkening_pixels, stats.darkening_pct)
         logger.info("    Mean change: %+.3f nW/cm²/sr", stats.mean_change)

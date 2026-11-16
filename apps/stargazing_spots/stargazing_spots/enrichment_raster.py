@@ -95,8 +95,12 @@ def raster_sample_join(
         dark_features = dark_features.drop_duplicates(subset=["name", "pixel_radiance"])
         n_dark = len(dark_features)
         if pre_dedup > n_dark:
-            logger.info("  Deduplicated: %d → %d (removed %d duplicates)",
-                        pre_dedup, n_dark, pre_dedup - n_dark)
+            logger.info(
+                "  Deduplicated: %d → %d (removed %d duplicates)",
+                pre_dedup,
+                n_dark,
+                pre_dedup - n_dark,
+            )
 
     logger.info("Raster-native spatial join:")
     logger.info("  Input features: %d", n_input)
@@ -165,8 +169,10 @@ def raster_sample_with_context(
             lambda t: "darkening" if t < -1.0 else ("brightening" if t > 1.0 else "stable")
         )
 
-    logger.info("  Added temporal context: stability=%s, trend=%s",
-                "yes" if stability is not None else "no",
-                "yes" if trend is not None else "no")
+    logger.info(
+        "  Added temporal context: stability=%s, trend=%s",
+        "yes" if stability is not None else "no",
+        "yes" if trend is not None else "no",
+    )
 
     return dark_features

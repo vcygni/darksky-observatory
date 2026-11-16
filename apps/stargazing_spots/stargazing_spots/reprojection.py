@@ -16,9 +16,7 @@ from rasterio.warp import Resampling, calculate_default_transform, reproject
 logger = logging.getLogger(__name__)
 
 # MODIS sinusoidal projection definition
-MODIS_SINUSOIDAL_PROJ4 = (
-    "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +R=6371007.181 +units=m +no_defs"
-)
+MODIS_SINUSOIDAL_PROJ4 = "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +R=6371007.181 +units=m +no_defs"
 MODIS_SINUSOIDAL_CRS = CRS.from_proj4(MODIS_SINUSOIDAL_PROJ4)
 
 # Full sinusoidal grid extent (meters)
@@ -68,6 +66,7 @@ def parse_tile_id(filename: str) -> tuple[int, int]:
         Tuple of (h, v) tile indices.
     """
     import re
+
     match = re.search(r"h(\d{2})v(\d{2})", filename)
     if not match:
         raise ValueError(f"Cannot parse tile ID from filename: {filename}")
@@ -99,15 +98,14 @@ def read_h5_radiance(h5_path: Path) -> tuple[np.ndarray, tuple[float, float, flo
             data = f[f"{grid_path}/AllAngle_Composite_Snow_Free"][:]
         else:
             available = list(f[grid_path].keys()) if grid_path in f else []
-            raise KeyError(
-                f"No radiance variable found in {h5_path}. Available: {available}"
-            )
+            raise KeyError(f"No radiance variable found in {h5_path}. Available: {available}")
 
         # Try to read bounds from metadata
         try:
             struct_meta = f["HDFEOS INFORMATION/StructMetadata.0"][()].decode()
             # Parse UpperLeftPointMtrs and LowerRightMtrs from the metadata string
             import re
+
             ul_match = re.search(r"UpperLeftPointMtrs=\(([-\d.]+),([-\d.]+)\)", struct_meta)
             lr_match = re.search(r"LowerRightMtrs=\(([-\d.]+),([-\d.]+)\)", struct_meta)
             if ul_match and lr_match:
@@ -130,7 +128,9 @@ def read_h5_radiance(h5_path: Path) -> tuple[np.ndarray, tuple[float, float, flo
     data[data >= 65535] = np.nan  # Common fill value in VIIRS products
     data[data < 0] = np.nan
 
-    logger.info("Read %s: shape=%s, valid pixels=%d", h5_path.name, data.shape, int(np.sum(~np.isnan(data))))
+    logger.info(
+        "Read %s: shape=%s, valid pixels=%d", h5_path.name, data.shape, int(np.sum(~np.isnan(data)))
+    )
     return data, bounds
 
 
@@ -177,20 +177,34 @@ def reproject_sinusoidal_to_wgs84(
 
     logger.info(
         "Source: %s, %dx%d pixels, sinusoidal bounds [%.0f, %.0f, %.0f, %.0f] m",
-        h5_path.name, width, height, x_min, y_min, x_max, y_max,
+        h5_path.name,
+        width,
+        height,
+        x_min,
+        y_min,
+        x_max,
+        y_max,
     )
 
     # Step 3: Calculate the target transform (WGS84)
     dst_crs = CRS.from_epsg(4326)
     dst_transform, dst_width, dst_height = calculate_default_transform(
-        src_crs, dst_crs, width, height,
-        left=x_min, bottom=y_min, right=x_max, top=y_max,
+        src_crs,
+        dst_crs,
+        width,
+        height,
+        left=x_min,
+        bottom=y_min,
+        right=x_max,
+        top=y_max,
         resolution=target_resolution,
     )
 
     logger.info(
         "Target: EPSG:4326, %dx%d pixels, resolution=%.6f°",
-        dst_width, dst_height, target_resolution,
+        dst_width,
+        dst_height,
+        target_resolution,
     )
 
     # Step 4: Perform the reprojection

@@ -87,7 +87,9 @@ def analyze_quality(radiance: xr.DataArray) -> QualityStats:
     logger.info("Quality analysis:")
     logger.info("  Total pixels in grid: %d", total)
     logger.info("  Usable (valid, non-negative): %d (%.1f%%)", usable_count, stats.good_pct)
-    logger.info("  Removed by QA filtering: %d (%.1f%%)", nan_count, 100 * nan_count / max(total, 1))
+    logger.info(
+        "  Removed by QA filtering: %d (%.1f%%)", nan_count, 100 * nan_count / max(total, 1)
+    )
     if negative_count > 0:
         logger.info("  Negative/artifact pixels: %d", negative_count)
 
@@ -108,9 +110,9 @@ def quality_report(radiance: xr.DataArray, year: str = "") -> str:
     header = f"Quality Report{f' ({year})' if year else ''}"
 
     report = f"""
-{'=' * 50}
+{"=" * 50}
 {header}
-{'=' * 50}
+{"=" * 50}
 
 Grid dimensions: {radiance.shape[0]} × {radiance.shape[1]} = {stats.total_pixels:,} total pixels
 
@@ -119,7 +121,7 @@ Pixel Classification:
   │ Category            │ Count     │ Percent │
   ├─────────────────────┼───────────┼─────────┤
   │ Usable (good + gap) │ {stats.good_pixels:>9,} │ {stats.good_pct:>5.1f}%  │
-  │ Removed (QA filter) │ {stats.nan_pixels:>9,} │ {100*stats.nan_pixels/max(stats.total_pixels,1):>5.1f}%  │
+  │ Removed (QA filter) │ {stats.nan_pixels:>9,} │ {100 * stats.nan_pixels / max(stats.total_pixels, 1):>5.1f}%  │
   └─────────────────────┴───────────┴─────────┘
 
 QA Flags Applied:
@@ -131,6 +133,6 @@ QA Flags Applied:
 Note: After blackmarblepy filtering, good and gap-filled pixels are
 indistinguishable. Temporal stability analysis (std dev across years)
 provides an alternative confidence metric.
-{'=' * 50}
+{"=" * 50}
 """
     return report

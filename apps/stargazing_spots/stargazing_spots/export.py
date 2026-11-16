@@ -45,26 +45,55 @@ def to_geojson(
 
     # Strip OSM noise — keep only useful columns
     KEEP_COLUMNS = [
-        "geometry", "name", "id", "@id",
+        "geometry",
+        "name",
+        "id",
+        "@id",
         # Pipeline assessment results
-        "predicted_sqm", "predicted_bortle", "predicted_brightness_mcd",
-        "ssi_score", "ssi_class",
+        "predicted_sqm",
+        "predicted_bortle",
+        "predicted_brightness_mcd",
+        "ssi_score",
+        "ssi_class",
         "clear_night_fraction",
         "sky_view_factor",
-        "land_cover_class", "land_cover_label", "land_cover_score",
-        "terrain_slope_deg", "slope_score", "slope_class",
+        "land_cover_class",
+        "land_cover_label",
+        "land_cover_score",
+        "terrain_slope_deg",
+        "slope_score",
+        "slope_class",
         "dem_elevation_m",
-        "pixel_radiance", "pixel_stability", "pixel_trend", "trend_direction",
-        "dark_confidence", "confidence_class",
-        "tier", "access_type", "access_score", "night_accessible", "access_warnings",
+        "pixel_radiance",
+        "pixel_stability",
+        "pixel_trend",
+        "trend_direction",
+        "dark_confidence",
+        "confidence_class",
+        "tier",
+        "access_type",
+        "access_score",
+        "night_accessible",
+        "access_warnings",
         "stargazing_score",
         # Seasonal
-        "ssi_summer", "ssi_winter", "ssi_spring", "ssi_autumn", "best_season",
+        "ssi_summer",
+        "ssi_winter",
+        "ssi_spring",
+        "ssi_autumn",
+        "best_season",
         # Observation planning
-        "mw_best_months", "mw_max_altitude_deg", "mw_peak_month",
+        "mw_best_months",
+        "mw_max_altitude_deg",
+        "mw_peak_month",
         # OSM context (only if useful)
-        "tourism", "natural", "leisure", "amenity", "man_made",
-        "ele", "region",
+        "tourism",
+        "natural",
+        "leisure",
+        "amenity",
+        "man_made",
+        "ele",
+        "region",
     ]
 
     available = [c for c in KEEP_COLUMNS if c in gdf.columns]
@@ -80,9 +109,7 @@ def to_geojson(
     with open(output_path) as f:
         geojson = json.load(f)
     for feature in geojson["features"]:
-        feature["properties"] = {
-            k: v for k, v in feature["properties"].items() if v is not None
-        }
+        feature["properties"] = {k: v for k, v in feature["properties"].items() if v is not None}
     if processing_params:
         geojson["processing"] = {
             **processing_params,

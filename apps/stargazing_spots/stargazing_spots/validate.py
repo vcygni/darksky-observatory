@@ -32,6 +32,7 @@ from shapely import wkt
 
 logger = logging.getLogger(__name__)
 
+
 def _find_validation_dir() -> Path:
     """Locate validation/portugal: $VALIDATION_DIR, else the nearest parent that has it.
 

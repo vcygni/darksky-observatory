@@ -129,14 +129,30 @@ def classify_temporal(
     coords = {"y": radiance_years[0].coords["y"], "x": radiance_years[0].coords["x"]}
     dims = ["y", "x"]
 
-    median_da = xr.DataArray(median_vals, dims=dims, coords=coords,
-                             attrs={"units": "nW/cm²/sr", "long_name": "Median Radiance"})
-    stability_da = xr.DataArray(std_vals, dims=dims, coords=coords,
-                                attrs={"units": "nW/cm²/sr", "long_name": "Temporal Std Dev"})
-    trend_da = xr.DataArray(trend_vals, dims=dims, coords=coords,
-                            attrs={"units": "nW/cm²/sr", "long_name": f"Trend ({year_labels[-1]} - {year_labels[0]})"})
-    consistency_da = xr.DataArray(consistency_vals, dims=dims, coords=coords,
-                                  attrs={"long_name": "Years dark", "max_value": n_years})
+    median_da = xr.DataArray(
+        median_vals,
+        dims=dims,
+        coords=coords,
+        attrs={"units": "nW/cm²/sr", "long_name": "Median Radiance"},
+    )
+    stability_da = xr.DataArray(
+        std_vals,
+        dims=dims,
+        coords=coords,
+        attrs={"units": "nW/cm²/sr", "long_name": "Temporal Std Dev"},
+    )
+    trend_da = xr.DataArray(
+        trend_vals,
+        dims=dims,
+        coords=coords,
+        attrs={"units": "nW/cm²/sr", "long_name": f"Trend ({year_labels[-1]} - {year_labels[0]})"},
+    )
+    consistency_da = xr.DataArray(
+        consistency_vals,
+        dims=dims,
+        coords=coords,
+        attrs={"long_name": "Years dark", "max_value": n_years},
+    )
 
     # Classify using median (more robust than any single year)
     dark_sky = median_da.where(median_da < threshold)
@@ -147,8 +163,13 @@ def classify_temporal(
     some_years_dark = int(np.nansum((consistency_vals > 0) & (consistency_vals < n_years)))
 
     logger.info("Temporal classification results:")
-    logger.info("  Dark (median < %.1f): %d/%d pixels (%.1f%%)",
-                threshold, dark_count, total_valid, 100 * dark_count / max(total_valid, 1))
+    logger.info(
+        "  Dark (median < %.1f): %d/%d pixels (%.1f%%)",
+        threshold,
+        dark_count,
+        total_valid,
+        100 * dark_count / max(total_valid, 1),
+    )
     logger.info("  Dark ALL %d years (high reliability): %d pixels", n_years, all_years_dark)
     logger.info("  Dark SOME years (variable): %d pixels", some_years_dark)
     logger.info("  Mean stability (std): %.3f nW/cm²/sr", float(np.nanmean(std_vals)))

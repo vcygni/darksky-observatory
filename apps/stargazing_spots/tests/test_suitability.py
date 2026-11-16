@@ -25,8 +25,14 @@ class TestSSIWeights:
 
     def test_invalid_weights_raise(self):
         with pytest.raises(ValueError):
-            SSIWeights(darkness=0.5, clear_sky=0.5, sky_openness=0.5,
-                       land_cover=0.1, slope=0.1, elevation=0.1)
+            SSIWeights(
+                darkness=0.5,
+                clear_sky=0.5,
+                sky_openness=0.5,
+                land_cover=0.1,
+                slope=0.1,
+                elevation=0.1,
+            )
 
 
 class TestNormalizeDarkness:
@@ -109,16 +115,19 @@ class TestComputeSSI:
     @pytest.fixture
     def sample_spots(self):
         """Create a minimal GeoDataFrame with all required columns."""
-        return gpd.GeoDataFrame({
-            "name": ["dark_flat_open", "urban_cloudy", "forest_steep"],
-            "geometry": [Point(-7.5, 38.5), Point(-9.1, 38.7), Point(-8.0, 40.0)],
-            "predicted_sqm": [21.5, 18.0, 21.0],
-            "clear_night_fraction": [0.65, 0.40, 0.50],
-            "sky_view_factor": [0.95, 0.90, 0.60],
-            "land_cover_score": [1.0, 0.0, 0.3],
-            "slope_score": [1.0, 0.8, 0.4],
-            "ele": [400, 50, 800],
-        }, crs="EPSG:4326")
+        return gpd.GeoDataFrame(
+            {
+                "name": ["dark_flat_open", "urban_cloudy", "forest_steep"],
+                "geometry": [Point(-7.5, 38.5), Point(-9.1, 38.7), Point(-8.0, 40.0)],
+                "predicted_sqm": [21.5, 18.0, 21.0],
+                "clear_night_fraction": [0.65, 0.40, 0.50],
+                "sky_view_factor": [0.95, 0.90, 0.60],
+                "land_cover_score": [1.0, 0.0, 0.3],
+                "slope_score": [1.0, 0.8, 0.4],
+                "ele": [400, 50, 800],
+            },
+            crs="EPSG:4326",
+        )
 
     def test_returns_ssi_columns(self, sample_spots):
         result = compute_ssi(sample_spots)

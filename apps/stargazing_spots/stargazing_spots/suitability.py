@@ -25,8 +25,14 @@ class SSIWeights:
     elevation: float = 0.05
 
     def __post_init__(self):
-        total = (self.darkness + self.clear_sky + self.sky_openness
-                 + self.land_cover + self.slope + self.elevation)
+        total = (
+            self.darkness
+            + self.clear_sky
+            + self.sky_openness
+            + self.land_cover
+            + self.slope
+            + self.elevation
+        )
         if abs(total - 1.0) > 0.01:
             raise ValueError(f"Weights must sum to 1.0, got {total:.3f}")
 
@@ -209,12 +215,20 @@ def compute_ssi(
     # Classification
     spots["ssi_class"] = spots["ssi_score"].apply(
         lambda s: (
-            "excellent" if s >= 80 else
-            "good" if s >= 65 else
-            "acceptable" if s >= 50 else
-            "marginal" if s >= 35 else
-            "poor"
-        ) if not np.isnan(s) else "unknown"
+            (
+                "excellent"
+                if s >= 80
+                else "good"
+                if s >= 65
+                else "acceptable"
+                if s >= 50
+                else "marginal"
+                if s >= 35
+                else "poor"
+            )
+            if not np.isnan(s)
+            else "unknown"
+        )
     )
 
     # Log summary

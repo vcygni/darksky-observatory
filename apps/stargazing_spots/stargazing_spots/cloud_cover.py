@@ -62,15 +62,24 @@ def compute_sun_altitude(hour_utc: int, day_of_year: int, latitude: float) -> fl
     gamma = 2 * np.pi / 365 * (day_of_year - 1 + (hour_utc - 12) / 24)
 
     # Solar declination (radians)
-    decl = (0.006918 - 0.399912 * np.cos(gamma) + 0.070257 * np.sin(gamma)
-            - 0.006758 * np.cos(2 * gamma) + 0.000907 * np.sin(2 * gamma)
-            - 0.002697 * np.cos(3 * gamma) + 0.00148 * np.sin(3 * gamma))
+    decl = (
+        0.006918
+        - 0.399912 * np.cos(gamma)
+        + 0.070257 * np.sin(gamma)
+        - 0.006758 * np.cos(2 * gamma)
+        + 0.000907 * np.sin(2 * gamma)
+        - 0.002697 * np.cos(3 * gamma)
+        + 0.00148 * np.sin(3 * gamma)
+    )
 
     # Equation of time (minutes)
-    eqtime = 229.18 * (0.000075 + 0.001868 * np.cos(gamma)
-                       - 0.032077 * np.sin(gamma)
-                       - 0.014615 * np.cos(2 * gamma)
-                       - 0.04089 * np.sin(2 * gamma))
+    eqtime = 229.18 * (
+        0.000075
+        + 0.001868 * np.cos(gamma)
+        - 0.032077 * np.sin(gamma)
+        - 0.014615 * np.cos(2 * gamma)
+        - 0.04089 * np.sin(2 * gamma)
+    )
 
     # Solar hour angle
     # Time offset in minutes (Portugal is near UTC, no timezone offset needed for ERA5 UTC data)
@@ -84,8 +93,7 @@ def compute_sun_altitude(hour_utc: int, day_of_year: int, latitude: float) -> fl
 
     # Solar altitude
     lat_rad = np.radians(latitude)
-    sin_alt = (np.sin(lat_rad) * np.sin(decl)
-               + np.cos(lat_rad) * np.cos(decl) * np.cos(hour_angle))
+    sin_alt = np.sin(lat_rad) * np.sin(decl) + np.cos(lat_rad) * np.cos(decl) * np.cos(hour_angle)
     altitude = np.degrees(np.arcsin(np.clip(sin_alt, -1, 1)))
 
     return altitude
@@ -132,10 +140,12 @@ def build_darkness_mask(latitudes: np.ndarray) -> np.ndarray:
     # Summary statistics
     _ = mask.sum(axis=(0, 1)) / 366  # noqa: F841
     logger.info("Darkness mask built: %d latitudes", n_lat)
-    logger.info("  Dark hours/day range: %.1f (summer, lat=%.1f) to %.1f (winter)",
-                mask[:, 172, :].sum(axis=0).min(),  # June 21
-                latitudes[mask[:, 172, :].sum(axis=0).argmin()],
-                mask[:, 355, :].sum(axis=0).max())  # Dec 21
+    logger.info(
+        "  Dark hours/day range: %.1f (summer, lat=%.1f) to %.1f (winter)",
+        mask[:, 172, :].sum(axis=0).min(),  # June 21
+        latitudes[mask[:, 172, :].sum(axis=0).argmin()],
+        mask[:, 355, :].sum(axis=0).max(),
+    )  # Dec 21
 
     return mask
 
@@ -188,7 +198,9 @@ def _download_era5_monthly_means(
         batch_end = min(batch_start + batch_size - 1, end_year)
         batch_years = [str(y) for y in range(batch_start, batch_end + 1)]
 
-        batch_file = output_path.parent / f"era5_tcc_batch_{region_tag}_{batch_start}_{batch_end}.nc"
+        batch_file = (
+            output_path.parent / f"era5_tcc_batch_{region_tag}_{batch_start}_{batch_end}.nc"
+        )
         batch_files.append(batch_file)
 
         if batch_file.exists():
@@ -226,12 +238,18 @@ def _download_era5_monthly_means(
             # Reshape: (batch, valid_time, lat, lon) → (valid_time, lat, lon)
             tcc = ds["tcc"]
             # Stack time and valid_time
-            stacked = tcc.stack(all_time=("time", "valid_time")).transpose("all_time", "latitude", "longitude")
+            stacked = tcc.stack(all_time=("time", "valid_time")).transpose(
+                "all_time", "latitude", "longitude"
+            )
             # Create clean dataset
-            flat_ds = xr.Dataset({"tcc": (["valid_time", "latitude", "longitude"], stacked.values)},
-                                 coords={"valid_time": ds["valid_time"].values,
-                                         "latitude": ds["latitude"].values,
-                                         "longitude": ds["longitude"].values})
+            flat_ds = xr.Dataset(
+                {"tcc": (["valid_time", "latitude", "longitude"], stacked.values)},
+                coords={
+                    "valid_time": ds["valid_time"].values,
+                    "latitude": ds["latitude"].values,
+                    "longitude": ds["longitude"].values,
+                },
+            )
             flat_datasets.append(flat_ds)
         elif "valid_time" in ds.dims:
             flat_datasets.append(ds[["tcc"]])
@@ -288,13 +306,17 @@ def compute_clear_night_fraction(
     lon_range = bounds["lon"]
 
     # Check cache (final result)
-    cache_file = config.cache_dir / f"era5_clear_night_{region}_{config.start_year}_{config.end_year}.nc"
+    cache_file = (
+        config.cache_dir / f"era5_clear_night_{region}_{config.start_year}_{config.end_year}.nc"
+    )
     if cache_file.exists():
         logger.info("Loading cached clear-night fraction: %s", cache_file)
         return xr.open_dataarray(cache_file)
 
     # Check if raw ERA5 data already downloaded
-    raw_file = config.cache_dir / f"era5_tcc_monthly_{region}_{config.start_year}_{config.end_year}.nc"
+    raw_file = (
+        config.cache_dir / f"era5_tcc_monthly_{region}_{config.start_year}_{config.end_year}.nc"
+    )
     if not raw_file.exists():
         _download_era5_monthly_means(
             output_path=raw_file,
@@ -343,10 +365,12 @@ def compute_clear_night_fraction(
     hours = ((times_dt - times_dt.astype("datetime64[D]")) / np.timedelta64(1, "h")).astype(int)
 
     # For monthly means: use the 15th of the month as representative day-of-year
-    representative_doy = np.array([
-        int((np.datetime64(f"2020-{m:02d}-15") - np.datetime64("2020-01-01")).astype(int)) + 1
-        for m in months
-    ])
+    representative_doy = np.array(
+        [
+            int((np.datetime64(f"2020-{m:02d}-15") - np.datetime64("2020-01-01")).astype(int)) + 1
+            for m in months
+        ]
+    )
 
     logger.info("Computing clear-night fraction (vectorized)...")
 
@@ -367,7 +391,7 @@ def compute_clear_night_fraction(
     weighted_clear = (clear_sky_probability * dark_3d).sum(axis=0)
 
     # Compute mean clear fraction during dark hours
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         clear_fraction = np.where(
             total_dark_weight > 0,
             weighted_clear / total_dark_weight,
@@ -387,8 +411,7 @@ def compute_clear_night_fraction(
             "darkness_definition": "Astronomical twilight (sun altitude < -18 degrees)",
             "data_source": "ERA5 monthly averaged reanalysis by hour of day (CDS API)",
             "references": (
-                "Hersbach et al. (2020) QJRMS 146:1999-2049; "
-                "Aksaker et al. (2020) MNRAS 493(1)"
+                "Hersbach et al. (2020) QJRMS 146:1999-2049; Aksaker et al. (2020) MNRAS 493(1)"
             ),
         },
     )
@@ -440,11 +463,12 @@ def resample_to_viirs_grid(
     mask = np.isnan(values)
     if mask.any():
         from scipy.ndimage import uniform_filter
+
         filled = np.where(mask, 0, values)
         count = np.where(mask, 0, 1.0)
-        filled_smooth = uniform_filter(filled, size=3, mode='constant')
-        count_smooth = uniform_filter(count, size=3, mode='constant')
-        with np.errstate(divide='ignore', invalid='ignore'):
+        filled_smooth = uniform_filter(filled, size=3, mode="constant")
+        count_smooth = uniform_filter(count, size=3, mode="constant")
+        with np.errstate(divide="ignore", invalid="ignore"):
             values = np.where(mask & (count_smooth > 0), filled_smooth / count_smooth, values)
         values = np.nan_to_num(values, nan=0.5)  # fallback for remaining NaN
 
@@ -454,12 +478,15 @@ def resample_to_viirs_grid(
         values = values[::-1, :]
 
     interpolator = RegularGridInterpolator(
-        (src_lat, src_lon), values,
-        method='linear', bounds_error=False, fill_value=None,
+        (src_lat, src_lon),
+        values,
+        method="linear",
+        bounds_error=False,
+        fill_value=None,
     )
 
     # Create target grid points
-    target_yy, target_xx = np.meshgrid(target_y, target_x, indexing='ij')
+    target_yy, target_xx = np.meshgrid(target_y, target_x, indexing="ij")
     points = np.column_stack([target_yy.ravel(), target_xx.ravel()])
 
     # Interpolate
@@ -471,6 +498,7 @@ def resample_to_viirs_grid(
 # ===========================================================================
 # CLAAS-3 High-Resolution Cloud Cover (5.5 km satellite observations)
 # ===========================================================================
+
 
 @dataclass
 class CLAAS3Config:
@@ -627,13 +655,17 @@ def compute_clear_night_fraction_claas3(
     latitudes = cfc.coords["latitude"].values
     n_lat = len(latitudes)
 
-    logger.info("  CLAAS-3 grid: %d lat x %d lon = %d cells (vs ERA5: ~425)",
-                n_lat, len(cfc.coords["longitude"].values),
-                n_lat * len(cfc.coords["longitude"].values))
-    logger.info("  Resolution: %.4f deg (~%.1f km at 39N)",
-                abs(latitudes[1] - latitudes[0]) if n_lat > 1 else 0.05,
-                abs(latitudes[1] - latitudes[0]) * 111 * np.cos(np.radians(39))
-                if n_lat > 1 else 5.5)
+    logger.info(
+        "  CLAAS-3 grid: %d lat x %d lon = %d cells (vs ERA5: ~425)",
+        n_lat,
+        len(cfc.coords["longitude"].values),
+        n_lat * len(cfc.coords["longitude"].values),
+    )
+    logger.info(
+        "  Resolution: %.4f deg (~%.1f km at 39N)",
+        abs(latitudes[1] - latitudes[0]) if n_lat > 1 else 0.05,
+        abs(latitudes[1] - latitudes[0]) * 111 * np.cos(np.radians(39)) if n_lat > 1 else 5.5,
+    )
 
     # Determine if we have hour-of-day dimension
     has_hours = any(d in cfc.dims for d in ["hour", "time_of_day", "hour_of_day"])
@@ -641,7 +673,9 @@ def compute_clear_night_fraction_claas3(
     if has_hours:
         # Same logic as ERA5: weight by astronomical darkness
         hour_dim = next(d for d in ["hour", "time_of_day", "hour_of_day"] if d in cfc.dims)
-        logger.info("  Diurnal cycle available (%s dimension) — applying darkness weighting", hour_dim)
+        logger.info(
+            "  Diurnal cycle available (%s dimension) — applying darkness weighting", hour_dim
+        )
 
         # Build darkness mask
         darkness_mask = build_darkness_mask(latitudes)
@@ -658,10 +692,17 @@ def compute_clear_night_fraction_claas3(
             hours = cfc.coords[hour_dim].values.astype(int)
 
             # Representative day of year for each month
-            representative_doy = np.array([
-                int((np.datetime64(f"2020-{m:02d}-15") - np.datetime64("2020-01-01")).astype(int)) + 1
-                for m in months
-            ])
+            representative_doy = np.array(
+                [
+                    int(
+                        (np.datetime64(f"2020-{m:02d}-15") - np.datetime64("2020-01-01")).astype(
+                            int
+                        )
+                    )
+                    + 1
+                    for m in months
+                ]
+            )
 
             # Vectorized: compute darkness for all (time, hour, lat) combinations
             _ = len(cfc.coords["longitude"].values)  # noqa: F841
@@ -707,7 +748,7 @@ def compute_clear_night_fraction_claas3(
         total_dark = dark_weight_2d
 
     # Compute final clear-night fraction
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         clear_fraction = np.where(
             total_dark > 0,
             weighted_clear / total_dark,
@@ -788,9 +829,7 @@ def compute_clear_night_fraction_best_available(
     )
 
     if claas3_available(claas3_cfg, region):
-        logger.info(
-            "CLAAS-3 data available — using satellite observations at 5.5 km resolution"
-        )
+        logger.info("CLAAS-3 data available — using satellite observations at 5.5 km resolution")
         try:
             result = compute_clear_night_fraction_claas3(claas3_cfg, region)
             logger.info(

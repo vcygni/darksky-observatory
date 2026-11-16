@@ -52,6 +52,7 @@ def run_full_assessment(
     # 1. Skyglow PSF -> predicted SQM
     logger.info("--- [1/6] Skyglow propagation (PSF convolution) ---")
     from stargazing_spots.skyglow import assess_spots as skyglow_assess
+
     spots = skyglow_assess(spots, radiance, x_coords, y_coords)
     logger.info("  Done: mean SQM = %.2f", spots["predicted_sqm"].mean())
 
@@ -65,9 +66,16 @@ def run_full_assessment(
         )
 
         # Try CLAAS-3 (5km satellite-observed) first, fall back to ERA5 (25km model)
-        claas3_file = Path(__file__).parent.parent / "input" / "portugal" / "cache" / "claas3_clear_night_mainland.nc"
+        claas3_file = (
+            Path(__file__).parent.parent
+            / "input"
+            / "portugal"
+            / "cache"
+            / "claas3_clear_night_mainland.nc"
+        )
         if claas3_file.exists() and region == "mainland":
             import xarray as xr
+
             clear_fraction_era5 = xr.open_dataarray(str(claas3_file))
             logger.info("  Using CLAAS-3 (5km satellite, 11200 grid cells)")
         else:
@@ -81,10 +89,14 @@ def run_full_assessment(
         # Sample at spot locations
         spot_cols = np.array([int(np.argmin(np.abs(x_coords - g.x))) for g in spots.geometry])
         spot_rows = np.array([int(np.argmin(np.abs(y_coords - g.y))) for g in spots.geometry])
-        clear_at_spots = np.array([
-            clear_resampled[r, c] if 0 <= r < clear_resampled.shape[0] and 0 <= c < clear_resampled.shape[1] else np.nan
-            for r, c in zip(spot_rows, spot_cols)
-        ])
+        clear_at_spots = np.array(
+            [
+                clear_resampled[r, c]
+                if 0 <= r < clear_resampled.shape[0] and 0 <= c < clear_resampled.shape[1]
+                else np.nan
+                for r, c in zip(spot_rows, spot_cols)
+            ]
+        )
         spots["clear_night_fraction"] = np.round(clear_at_spots, 3)
         logger.info("  Done: mean clear fraction = %.1f%%", np.nanmean(clear_at_spots) * 100)
     except Exception as e:
@@ -97,14 +109,17 @@ def run_full_assessment(
 
     def _compute_svf():
         from stargazing_spots.sky_view import compute_svf_at_points
+
         return compute_svf_at_points(spots)  # Returns (svf, dem_elevation) tuple
 
     def _compute_land_cover():
         from stargazing_spots.land_cover import get_land_cover_at_points
+
         return get_land_cover_at_points(spots)
 
     def _compute_slope():
         from stargazing_spots.accessibility import compute_slope_at_points
+
         return compute_slope_at_points(spots)
 
     svf_result = None
@@ -148,6 +163,7 @@ def run_full_assessment(
     # Apply land cover results
     if lc_result is not None:
         from stargazing_spots.land_cover import LAND_COVER_CLASSES
+
         class_codes, lc_scores = lc_result
         spots["land_cover_class"] = class_codes
         spots["land_cover_label"] = [LAND_COVER_CLASSES.get(c, "unknown") for c in class_codes]
@@ -158,6 +174,7 @@ def run_full_assessment(
     # Apply slope results
     if slope_result is not None:
         from stargazing_spots.accessibility import classify_slope
+
         spots["terrain_slope_deg"] = np.round(slope_result, 1)
         scores_labels = [classify_slope(s) for s in slope_result]
         spots["slope_score"] = [s[0] for s in scores_labels]
@@ -169,6 +186,7 @@ def run_full_assessment(
     logger.info("--- [6/7] Nighttime accessibility ---")
     try:
         from stargazing_spots.access_check import assess_access
+
         spots = assess_access(spots)
         n_restricted = (~spots["night_accessible"]).sum()
         if n_restricted > 0:
@@ -179,6 +197,7 @@ def run_full_assessment(
     # 7. Compute SSI (weighted combination of all layers)
     logger.info("--- [7/7] Stargazing Suitability Index (SSI) ---")
     from stargazing_spots.suitability import compute_ssi
+
     spots = compute_ssi(spots)
 
     # Summary
@@ -238,7 +257,9 @@ def thin_spatially(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     n_dup = len(ranked) - len(keep)
     ranked = ranked.iloc[keep]
     if n_dup:
-        logger.info("  Deduplication: removed %d spots within %d m of a better spot", n_dup, DEDUP_RADIUS_M)
+        logger.info(
+            "  Deduplication: removed %d spots within %d m of a better spot", n_dup, DEDUP_RADIUS_M
+        )
 
     if len(ranked) > 100:
         cell_y = np.floor(ranked.geometry.y / DENSITY_CELL_DEG).astype(int)
@@ -249,10 +270,11 @@ def thin_spatially(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         if n_cap:
             logger.info(
                 "  Density cap: removed %d spots (max %d per %.2f deg cell, fixed grid)",
-                n_cap, DENSITY_MAX_PER_CELL, DENSITY_CELL_DEG,
+                n_cap,
+                DENSITY_MAX_PER_CELL,
+                DENSITY_CELL_DEG,
             )
     return ranked
-
 
 
 def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -303,11 +325,13 @@ def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
             logger.info("  Removed %d spots (SSI < 65: not good/excellent)", n_low)
 
     n_final = len(spots)
-    logger.info("  Filter result: %d -> %d spots (%d removed)",
-                n_initial, n_final, n_initial - n_final)
+    logger.info(
+        "  Filter result: %d -> %d spots (%d removed)", n_initial, n_final, n_initial - n_final
+    )
 
     # Tiering: classify spots by infrastructure level
     import pandas as pd
+
     tier1_tags = {
         "tourism": ["viewpoint", "camp_site", "picnic_site", "wilderness_hut"],
         "amenity": ["shelter"],

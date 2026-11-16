@@ -45,7 +45,7 @@ def _compute_slope_horn(dem: np.ndarray, cell_size_m: float = 30.0) -> np.ndarra
         2D array of slope in degrees.
     """
     # Pad edges for the 3×3 kernel
-    padded = np.pad(dem, 1, mode='edge')
+    padded = np.pad(dem, 1, mode="edge")
 
     # Horn's method: weighted finite differences
     # dz/dx = ((c + 2f + i) - (a + 2d + g)) / (8 * cellsize)

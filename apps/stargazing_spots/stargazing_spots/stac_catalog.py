@@ -26,8 +26,7 @@ logger = logging.getLogger(__name__)
 
 PORTUGAL_BBOX = [-9.52, 36.96, -6.19, 42.15]
 SOURCE_COLLECTION_URL = (
-    "https://ladsweb.modaps.eosdis.nasa.gov/missions-and-measurements/"
-    "products/VNP46A4"
+    "https://ladsweb.modaps.eosdis.nasa.gov/missions-and-measurements/products/VNP46A4"
 )
 
 
@@ -64,9 +63,7 @@ def create_darksky_catalog(
     )
 
     spatial_extent = SpatialExtent(bboxes=[PORTUGAL_BBOX])
-    temporal_extent = TemporalExtent(
-        intervals=[[datetime(2023, 1, 1, tzinfo=UTC), None]]
-    )
+    temporal_extent = TemporalExtent(intervals=[[datetime(2023, 1, 1, tzinfo=UTC), None]])
     extent = Extent(spatial=spatial_extent, temporal=temporal_extent)
 
     collection = Collection(
@@ -90,13 +87,15 @@ def create_darksky_catalog(
         id=f"portugal-darksky-{processing_date}",
         geometry={
             "type": "Polygon",
-            "coordinates": [[
-                [PORTUGAL_BBOX[0], PORTUGAL_BBOX[1]],
-                [PORTUGAL_BBOX[2], PORTUGAL_BBOX[1]],
-                [PORTUGAL_BBOX[2], PORTUGAL_BBOX[3]],
-                [PORTUGAL_BBOX[0], PORTUGAL_BBOX[3]],
-                [PORTUGAL_BBOX[0], PORTUGAL_BBOX[1]],
-            ]],
+            "coordinates": [
+                [
+                    [PORTUGAL_BBOX[0], PORTUGAL_BBOX[1]],
+                    [PORTUGAL_BBOX[2], PORTUGAL_BBOX[1]],
+                    [PORTUGAL_BBOX[2], PORTUGAL_BBOX[3]],
+                    [PORTUGAL_BBOX[0], PORTUGAL_BBOX[3]],
+                    [PORTUGAL_BBOX[0], PORTUGAL_BBOX[1]],
+                ]
+            ],
         },
         bbox=PORTUGAL_BBOX,
         datetime=datetime.fromisoformat(processing_date).replace(tzinfo=UTC),

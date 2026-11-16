@@ -1,6 +1,5 @@
 """Tests for observation planning (Milky Way, moon phases)."""
 
-
 from stargazing_spots.observation_planning import (
     milky_way_season,
     moon_free_nights_per_month,

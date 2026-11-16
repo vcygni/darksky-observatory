@@ -207,8 +207,13 @@ def compute_svf_at_points(
             continue
 
         url = _dem_tile_path(tile_lat, tile_lon)
-        logger.info("  Tile N%02d W%03d: %d spots (%s)",
-                    abs(tile_lat), abs(tile_lon), len(tile_indices), url.split("/")[-1])
+        logger.info(
+            "  Tile N%02d W%03d: %d spots (%s)",
+            abs(tile_lat),
+            abs(tile_lon),
+            len(tile_indices),
+            url.split("/")[-1],
+        )
 
         try:
             with rasterio.open(url) as src:
@@ -262,8 +267,11 @@ def compute_svf_at_points(
                 logger.warning("  Hansen tile failed: %s", e)
 
         mean_canopy = canopy_cover[canopy_cover > 0].mean() if (canopy_cover > 0).any() else 0
-        logger.info("  Canopy cover: mean=%.0f%% (where >0), %d spots in forest (>30%%)",
-                    mean_canopy * 100, (canopy_cover > 0.3).sum())
+        logger.info(
+            "  Canopy cover: mean=%.0f%% (where >0), %d spots in forest (>30%%)",
+            mean_canopy * 100,
+            (canopy_cover > 0.3).sum(),
+        )
 
     # --- Step 3: Combine terrain SVF with canopy correction ---
     # effective_SVF = terrain_SVF × (1 - canopy_fraction)
@@ -272,8 +280,12 @@ def compute_svf_at_points(
     # Summary
     valid = effective_svf[~np.isnan(effective_svf)]
     if len(valid) > 0:
-        logger.info("Effective SVF (terrain + canopy): mean=%.3f, range=%.3f–%.3f",
-                    valid.mean(), valid.min(), valid.max())
+        logger.info(
+            "Effective SVF (terrain + canopy): mean=%.3f, range=%.3f–%.3f",
+            valid.mean(),
+            valid.min(),
+            valid.max(),
+        )
         logger.info("  Open sky (SVF>0.85): %d spots", (valid > 0.85).sum())
         logger.info("  Moderate (0.5-0.85): %d spots", ((valid >= 0.5) & (valid <= 0.85)).sum())
         logger.info("  Obstructed (SVF<0.5): %d spots", (valid < 0.5).sum())

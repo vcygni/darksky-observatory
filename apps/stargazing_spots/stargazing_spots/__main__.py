@@ -68,6 +68,7 @@ def load_cached_radiance(cache_path: Path) -> xr.DataArray:
     if cache_path.suffix == ".joblib":
         ds = jl.load(cache_path)
         from stargazing_spots.processing import clean_radiance
+
         layer = ds["NearNadir_Composite_Snow_Free"].squeeze("time", drop=True)
         return clean_radiance(layer)
 
@@ -129,6 +130,7 @@ def _load_from_parquet(parquet_path: Path) -> xr.DataArray:
 
 class _ArgsRef:
     """Simple container to pass optional flags into run_pipeline."""
+
     run_sensitivity: bool = False
 
 
@@ -176,6 +178,7 @@ def run_pipeline(
         logger.info("STEP 0b: Threshold sensitivity analysis")
         logger.info("=" * 60)
         from stargazing_spots.processing import clean_radiance as _clean
+
         sens_df = run_sensitivity(_clean(radiance))
         sens_path = output_dir / "sensitivity_analysis.csv"
         sens_df.to_csv(sens_path, index=False)
@@ -192,8 +195,12 @@ def run_pipeline(
     temporal_result = None
     if temporal_layers and len(temporal_layers) >= 2:
         labels = temporal_labels or [str(i) for i in range(len(temporal_layers))]
-        logger.info("Using TEMPORAL composite (%d years: %s)", len(temporal_layers), ", ".join(labels))
-        temporal_result = classify_temporal(temporal_layers, threshold=threshold, year_labels=labels)
+        logger.info(
+            "Using TEMPORAL composite (%d years: %s)", len(temporal_layers), ", ".join(labels)
+        )
+        temporal_result = classify_temporal(
+            temporal_layers, threshold=threshold, year_labels=labels
+        )
         dark_sky_full = temporal_result["dark_sky"]
         # Fill NaN extent for COG export
         dark_sky_for_cog = temporal_result["median"].where(temporal_result["median"] < threshold)
@@ -209,8 +216,14 @@ def run_pipeline(
 
     timings["step1_classification_s"] = round(time.perf_counter() - t1, 3)
     metrics["dark_pixels"] = len(dark_coords)
-    metrics["total_valid_pixels"] = int(dark_sky_for_cog.count()) if not temporal_result else temporal_result["stats"]["total_valid_pixels"]
-    metrics["dark_pct"] = round(100 * metrics["dark_pixels"] / max(metrics["total_valid_pixels"], 1), 2)
+    metrics["total_valid_pixels"] = (
+        int(dark_sky_for_cog.count())
+        if not temporal_result
+        else temporal_result["stats"]["total_valid_pixels"]
+    )
+    metrics["dark_pct"] = round(
+        100 * metrics["dark_pixels"] / max(metrics["total_valid_pixels"], 1), 2
+    )
 
     # Step 2: Export COGs
     t2 = time.perf_counter()
@@ -237,6 +250,7 @@ def run_pipeline(
         to_cog(confidence_layer, output_dir / "dark_confidence.tif")
     else:
         from stargazing_spots.processing import clean_radiance as _cr
+
         confidence_layer = compute_confidence_layer(
             median_radiance=_cr(radiance), threshold=threshold
         )
@@ -373,13 +387,17 @@ def run_pipeline(
     logger.info("=" * 60)
     logger.info("PIPELINE COMPLETE (%.1fs total)", total_elapsed)
     logger.info("=" * 60)
-    logger.info("  Dark pixels:  %d (%.1f%%)", metrics.get("dark_pixels", 0), metrics.get("dark_pct", 0))
+    logger.info(
+        "  Dark pixels:  %d (%.1f%%)", metrics.get("dark_pixels", 0), metrics.get("dark_pct", 0)
+    )
     if "spots_count" in metrics:
         logger.info("  Spots found:  %d", metrics["spots_count"])
-    logger.info("  Timing: classification=%.1fs, export=%.1fs, enrichment=%.1fs",
-                timings.get("step1_classification_s", 0),
-                timings.get("step2_cog_export_s", 0),
-                timings.get("step3_enrichment_s", 0))
+    logger.info(
+        "  Timing: classification=%.1fs, export=%.1fs, enrichment=%.1fs",
+        timings.get("step1_classification_s", 0),
+        timings.get("step2_cog_export_s", 0),
+        timings.get("step3_enrichment_s", 0),
+    )
     logger.info("  Summary: %s", summary_path)
 
 
@@ -490,7 +508,13 @@ def _run_single(args):
     else:
         from stargazing_spots.acquisition import extract_radiance_layer, fetch_viirs_radiance
 
-        boundary_path = Path(__file__).parent.parent / "input" / "portugal" / "boundary" / "gadm41_PRT_1.json.zip"
+        boundary_path = (
+            Path(__file__).parent.parent
+            / "input"
+            / "portugal"
+            / "boundary"
+            / "gadm41_PRT_1.json.zip"
+        )
         if not boundary_path.exists():
             logger.error("Boundary file not found: %s", boundary_path)
             raise SystemExit(1)
@@ -594,9 +618,7 @@ def _run_all_regions(args, regions: dict):
             region_metrics[region_name] = {"spots_count": 0}
 
         # Run change detection per region
-        _run_change_detection_for_layers(
-            temporal_layers, region_output / "change_detection"
-        )
+        _run_change_detection_for_layers(temporal_layers, region_output / "change_detection")
 
     # Merge all regions into unified output
     logger.info("")
@@ -637,9 +659,9 @@ def _run_all_regions(args, regions: dict):
 
     # Write unified run metadata
     run_summary = {
-        "run_timestamp": __import__("datetime").datetime.now(
-            __import__("datetime").timezone.utc
-        ).isoformat(),
+        "run_timestamp": __import__("datetime")
+        .datetime.now(__import__("datetime").timezone.utc)
+        .isoformat(),
         "pipeline_version": "0.7.0",
         "mode": "all_regions",
         "parameters": {

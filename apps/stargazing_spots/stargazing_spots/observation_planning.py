@@ -163,8 +163,7 @@ def add_planning_columns(spots_gdf):
 
 def _months_str(months: list) -> str:
     """Convert month numbers to abbreviated string."""
-    names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-             "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     if not months:
         return "none"
-    return f"{names[months[0]-1]}–{names[months[-1]-1]}"
+    return f"{names[months[0] - 1]}–{names[months[-1] - 1]}"

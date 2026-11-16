@@ -2,8 +2,7 @@
 
 # === Setup ===
 install:
-	uv sync
-	cd apps/stargazing_spots && uv sync
+	uv sync --all-packages  # root dev group + every workspace member and its dev group
 
 download-data:
 	cd apps/stargazing_spots && uv run python scripts/download_terrain_data.py
@@ -23,11 +22,11 @@ test:
 	uv run python -m pytest apps/stargazing_spots/tests/ -v
 
 lint:
-	uv run ruff check apps/stargazing_spots/stargazing_spots/ apps/stargazing_spots/tests/
-	uv run ruff format --check apps/stargazing_spots/stargazing_spots/
+	uv run ruff check apps/stargazing_spots/ scripts/
+	uv run ruff format --check apps/stargazing_spots/ scripts/
 
 format:
-	uv run ruff format apps/stargazing_spots/stargazing_spots/ apps/stargazing_spots/tests/
+	uv run ruff format apps/stargazing_spots/ scripts/
 
 # === Pipeline ===
 run:

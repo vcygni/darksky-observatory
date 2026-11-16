@@ -43,22 +43,22 @@ LAND_COVER_CLASSES = {
 # Tree cover (10) is handled probabilistically via Hansen canopy cover.
 SUITABILITY = {
     10: (None, "probabilistic"),  # Determined by Hansen canopy cover
-    20: (0.8, "good"),            # shrubland — low, open above
-    30: (1.0, "excellent"),       # grassland — fully open
-    40: (0.6, "acceptable"),      # cropland — open but variable
-    50: (0.0, "unsuitable"),      # built-up — lights/buildings
-    60: (1.0, "excellent"),       # bare/sparse — no obstruction
-    70: (0.5, "marginal"),        # snow/ice
-    80: (0.0, "unsuitable"),      # water — can't stand there
-    90: (0.4, "marginal"),        # wetland — open but inaccessible
-    95: (0.0, "unsuitable"),      # mangroves
-    100: (0.8, "good"),           # moss/lichen — open, high altitude
+    20: (0.8, "good"),  # shrubland — low, open above
+    30: (1.0, "excellent"),  # grassland — fully open
+    40: (0.6, "acceptable"),  # cropland — open but variable
+    50: (0.0, "unsuitable"),  # built-up — lights/buildings
+    60: (1.0, "excellent"),  # bare/sparse — no obstruction
+    70: (0.5, "marginal"),  # snow/ice
+    80: (0.0, "unsuitable"),  # water — can't stand there
+    90: (0.4, "marginal"),  # wetland — open but inaccessible
+    95: (0.0, "unsuitable"),  # mangroves
+    100: (0.8, "good"),  # moss/lichen — open, high altitude
 }
 
 # Probabilistic tree cover thresholds for suitability labels
 TREE_PROB_THRESHOLDS = {
-    "high_suitability": 0.3,   # canopy < 30% → open woodland, good for stargazing
-    "low_suitability": 0.8,    # canopy > 80% → dense forest, unsuitable
+    "high_suitability": 0.3,  # canopy < 30% → open woodland, good for stargazing
+    "low_suitability": 0.8,  # canopy > 80% → dense forest, unsuitable
 }
 
 
@@ -121,9 +121,9 @@ def _canopy_cover_to_label(canopy_fraction: float) -> str:
         Human-readable suitability label.
     """
     if canopy_fraction < TREE_PROB_THRESHOLDS["high_suitability"]:
-        return "good"       # Sparse woodland, open enough for stargazing
+        return "good"  # Sparse woodland, open enough for stargazing
     elif canopy_fraction < TREE_PROB_THRESHOLDS["low_suitability"]:
-        return "moderate"   # Mixed/edge — don't filter, but reduced score
+        return "moderate"  # Mixed/edge — don't filter, but reduced score
     else:
         return "unsuitable"  # Dense closed canopy
 
@@ -159,8 +159,11 @@ def get_tree_cover_at_points(
             hansen_tiles[key] = []
         hansen_tiles[key].append(idx)
 
-    logger.info("  Querying Hansen canopy cover for %d tree pixels across %d tiles...",
-                len(indices), len(hansen_tiles))
+    logger.info(
+        "  Querying Hansen canopy cover for %d tree pixels across %d tiles...",
+        len(indices),
+        len(hansen_tiles),
+    )
 
     for (tile_lat, tile_lon), tile_indices in hansen_tiles.items():
         url = _hansen_tile_url(lats[tile_indices[0]], lons[tile_indices[0]])
@@ -247,7 +250,9 @@ def get_land_cover_at_points(spots: gpd.GeoDataFrame) -> tuple[np.ndarray, np.nd
                         # Assign score for non-tree classes immediately
                         if value != 10:
                             score_entry = SUITABILITY.get(value, (0.5, "unknown"))
-                            suitability_scores[idx] = score_entry[0] if score_entry[0] is not None else 0.5
+                            suitability_scores[idx] = (
+                                score_entry[0] if score_entry[0] is not None else 0.5
+                            )
                     else:
                         class_codes[idx] = 0
                         suitability_scores[idx] = np.nan
@@ -262,8 +267,10 @@ def get_land_cover_at_points(spots: gpd.GeoDataFrame) -> tuple[np.ndarray, np.nd
     tree_indices = [i for i in range(n_spots) if class_codes[i] == 10]
 
     if tree_indices:
-        logger.info("  %d spots classified as tree_cover — refining with Hansen canopy...",
-                    len(tree_indices))
+        logger.info(
+            "  %d spots classified as tree_cover — refining with Hansen canopy...",
+            len(tree_indices),
+        )
 
         canopy_values = get_tree_cover_at_points(lats, lons, tree_indices)
 
@@ -272,7 +279,9 @@ def get_land_cover_at_points(spots: gpd.GeoDataFrame) -> tuple[np.ndarray, np.nd
             suitability_scores[idx] = _canopy_cover_to_score(canopy_fraction)
 
         # Log the probabilistic distribution
-        tree_scores = [suitability_scores[i] for i in tree_indices if not np.isnan(suitability_scores[i])]
+        tree_scores = [
+            suitability_scores[i] for i in tree_indices if not np.isnan(suitability_scores[i])
+        ]
         if tree_scores:
             tree_scores_arr = np.array(tree_scores)
             n_open = (tree_scores_arr >= 0.7).sum()
@@ -282,7 +291,9 @@ def get_land_cover_at_points(spots: gpd.GeoDataFrame) -> tuple[np.ndarray, np.nd
             logger.info("      Open woodland (canopy <30%%): %d spots (score >= 0.7)", n_open)
             logger.info("      Mixed/edge (canopy 30-80%%): %d spots (score 0.2-0.7)", n_moderate)
             logger.info("      Dense forest (canopy >80%%): %d spots (score < 0.2)", n_dense)
-            logger.info("    Previously ALL %d would have been scored 0.0 (binary)", len(tree_indices))
+            logger.info(
+                "    Previously ALL %d would have been scored 0.0 (binary)", len(tree_indices)
+            )
 
     # --- Summary ---
     valid = suitability_scores[~np.isnan(suitability_scores)]
@@ -295,18 +306,30 @@ def get_land_cover_at_points(spots: gpd.GeoDataFrame) -> tuple[np.ndarray, np.nd
                     tree_valid = suitability_scores[class_codes == 10]
                     tree_valid = tree_valid[~np.isnan(tree_valid)]
                     mean_score = tree_valid.mean() if len(tree_valid) > 0 else 0
-                    logger.info("    %s (%d): %d spots [probabilistic, mean_score=%.2f]",
-                                label, code, count, mean_score)
+                    logger.info(
+                        "    %s (%d): %d spots [probabilistic, mean_score=%.2f]",
+                        label,
+                        code,
+                        count,
+                        mean_score,
+                    )
                 else:
                     logger.info("    %s (%d): %d spots", label, code, count)
 
         unsuitable = (valid == 0.0).sum()
-        logger.info("  Summary: %d suitable (score>0), %d unsuitable (score=0)",
-                    (valid > 0).sum(), unsuitable)
-        logger.info("  Improvement: binary approach would score %d tree spots as 0.0;",
-                    len(tree_indices))
-        rescued = sum(1 for i in tree_indices
-                      if not np.isnan(suitability_scores[i]) and suitability_scores[i] > 0.0)
+        logger.info(
+            "  Summary: %d suitable (score>0), %d unsuitable (score=0)",
+            (valid > 0).sum(),
+            unsuitable,
+        )
+        logger.info(
+            "  Improvement: binary approach would score %d tree spots as 0.0;", len(tree_indices)
+        )
+        rescued = sum(
+            1
+            for i in tree_indices
+            if not np.isnan(suitability_scores[i]) and suitability_scores[i] > 0.0
+        )
         logger.info("    probabilistic approach rescues %d of them (canopy < 100%%)", rescued)
 
     return class_codes, suitability_scores

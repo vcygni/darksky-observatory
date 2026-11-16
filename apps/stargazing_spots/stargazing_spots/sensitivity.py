@@ -68,7 +68,9 @@ def run_sensitivity(
     valid_values = values[valid_mask]
     total_valid = len(valid_values)
 
-    logger.info("Sensitivity analysis: %d thresholds, %d valid pixels", len(thresholds), total_valid)
+    logger.info(
+        "Sensitivity analysis: %d thresholds, %d valid pixels", len(thresholds), total_valid
+    )
 
     results = []
     prev_dark = 0
@@ -92,21 +94,25 @@ def run_sensitivity(
         marginal_pct = 100 * marginal / max(total_valid, 1)
         prev_dark = dark_count
 
-        results.append({
-            "threshold_nw": t,
-            "dark_pixels": dark_count,
-            "dark_area_km2": round(dark_area, 1),
-            "dark_pct": round(dark_pct, 2),
-            "bortle_class": bortle,
-            "marginal_gain_pixels": marginal,
-            "marginal_gain_pct": round(marginal_pct, 2),
-        })
+        results.append(
+            {
+                "threshold_nw": t,
+                "dark_pixels": dark_count,
+                "dark_area_km2": round(dark_area, 1),
+                "dark_pct": round(dark_pct, 2),
+                "bortle_class": bortle,
+                "marginal_gain_pixels": marginal,
+                "marginal_gain_pct": round(marginal_pct, 2),
+            }
+        )
 
     df = pd.DataFrame(results)
 
     # Log summary
     logger.info("Sensitivity results:")
-    logger.info("  %-8s %-12s %-12s %-10s %s", "Thresh", "Dark px", "Area (km²)", "% total", "Bortle")
+    logger.info(
+        "  %-8s %-12s %-12s %-10s %s", "Thresh", "Dark px", "Area (km²)", "% total", "Bortle"
+    )
     for _, row in df.iterrows():
         marker = " ◄" if row["threshold_nw"] == 3.0 else ""
         logger.info(
@@ -321,14 +327,24 @@ def validation_calibrated_threshold(
     n_skipped = len(certified_sites) - n_total
 
     logger.info("Validation-calibrated threshold analysis:")
-    logger.info("  Input sites: %d, within raster coverage: %d, with valid data: %d",
-                len(certified_sites), n_total, n_valid)
+    logger.info(
+        "  Input sites: %d, within raster coverage: %d, with valid data: %d",
+        len(certified_sites),
+        n_total,
+        n_valid,
+    )
     if n_skipped > 0:
         logger.info("  Skipped %d sites outside raster coverage (islands/other regions)", n_skipped)
-    logger.info("  Site radiance range: %.2f – %.2f nW/cm²/sr",
-                np.nanmin(site_radiances), np.nanmax(site_radiances))
-    logger.info("  Site radiance mean: %.2f, median: %.2f",
-                np.nanmean(site_radiances), np.nanmedian(site_radiances))
+    logger.info(
+        "  Site radiance range: %.2f – %.2f nW/cm²/sr",
+        np.nanmin(site_radiances),
+        np.nanmax(site_radiances),
+    )
+    logger.info(
+        "  Site radiance mean: %.2f, median: %.2f",
+        np.nanmean(site_radiances),
+        np.nanmedian(site_radiances),
+    )
 
     # For each threshold, compute detection rate
     valid_values = values[~np.isnan(values)]
@@ -347,14 +363,16 @@ def validation_calibrated_threshold(
         else:
             f_score = 0
 
-        results.append({
-            "threshold_nw": t,
-            "sites_detected": detected,
-            "detection_rate_pct": round(detection_rate, 1),
-            "dark_area_pct": round(dark_pct, 1),
-            "selectivity_pct": round(selectivity, 1),
-            "f_score": round(f_score, 2),
-        })
+        results.append(
+            {
+                "threshold_nw": t,
+                "sites_detected": detected,
+                "detection_rate_pct": round(detection_rate, 1),
+                "dark_area_pct": round(dark_pct, 1),
+                "selectivity_pct": round(selectivity, 1),
+                "f_score": round(f_score, 2),
+            }
+        )
 
     results_df = pd.DataFrame(results)
 
@@ -372,8 +390,13 @@ def validation_calibrated_threshold(
         marker = " ◄ optimal" if row["threshold_nw"] == optimal else ""
         logger.info(
             "    %.1f nW: %d/%d sites detected (%.0f%%), area=%.0f%%, F=%.1f%s",
-            row["threshold_nw"], row["sites_detected"], n_valid,
-            row["detection_rate_pct"], row["dark_area_pct"], row["f_score"], marker,
+            row["threshold_nw"],
+            row["sites_detected"],
+            n_valid,
+            row["detection_rate_pct"],
+            row["dark_area_pct"],
+            row["f_score"],
+            marker,
         )
 
     logger.info("  Validation-calibrated optimal threshold: %.1f nW/cm²/sr", optimal)

@@ -87,8 +87,12 @@ def compute_sky_brightness(
     if config is None:
         config = PropagationConfig()
 
-    logger.info("Building PSF kernel (radius=%.0fkm, exponent=%.1f, softening=%.1fkm)...",
-                config.integration_radius_km, config.psf_exponent, config.softening_km)
+    logger.info(
+        "Building PSF kernel (radius=%.0fkm, exponent=%.1f, softening=%.1fkm)...",
+        config.integration_radius_km,
+        config.psf_exponent,
+        config.softening_km,
+    )
     psf = build_psf_kernel(
         radius_km=config.integration_radius_km,
         pixel_size_km=config.pixel_size_km,
@@ -101,14 +105,10 @@ def compute_sky_brightness(
     radiance_clean = np.where(np.isnan(radiance), 0.0, radiance)
     radiance_clean = np.maximum(radiance_clean, 0.0)
 
-    pixel_area_km2 = config.pixel_size_km ** 2
+    pixel_area_km2 = config.pixel_size_km**2
 
     logger.info("Running FFT convolution...")
-    raw_integral = fftconvolve(
-        radiance_clean * pixel_area_km2,
-        psf,
-        mode='same'
-    )
+    raw_integral = fftconvolve(radiance_clean * pixel_area_km2, psf, mode="same")
     raw_integral = np.maximum(raw_integral, 0.0)
 
     sky_brightness = CALIB_FACTOR * raw_integral
@@ -116,8 +116,11 @@ def compute_sky_brightness(
 
     valid = sky_brightness[~np.isnan(sky_brightness)]
     logger.info("  Artificial brightness range: %.4f – %.2f mcd/m²", valid.min(), valid.max())
-    logger.info("  Mean: %.4f mcd/m² (%.1f%% of natural)",
-                valid.mean(), 100 * valid.mean() / NATURAL_SKY_MCDM2)
+    logger.info(
+        "  Mean: %.4f mcd/m² (%.1f%% of natural)",
+        valid.mean(),
+        100 * valid.mean() / NATURAL_SKY_MCDM2,
+    )
 
     return sky_brightness
 
@@ -144,7 +147,7 @@ def brightness_to_sqm(artificial_mcdm2: np.ndarray) -> np.ndarray:
     total_mcdm2 = artificial_mcdm2 + NATURAL_SKY_MCDM2
     total_cdm2 = total_mcdm2 / 1000.0  # mcd → cd
 
-    with np.errstate(divide='ignore', invalid='ignore'):
+    with np.errstate(divide="ignore", invalid="ignore"):
         sqm = -2.5 * np.log10(total_cdm2) + 12.583
 
     return sqm
@@ -257,34 +260,42 @@ def assess_spots(
     spot_cols = np.array([int(np.argmin(np.abs(x_coords - geom.x))) for geom in spots.geometry])
     spot_rows = np.array([int(np.argmin(np.abs(y_coords - geom.y))) for geom in spots.geometry])
 
-    brightness_values = np.array([
-        sky_brightness[r, c] if 0 <= r < sky_brightness.shape[0] and 0 <= c < sky_brightness.shape[1] else np.nan
-        for r, c in zip(spot_rows, spot_cols)
-    ])
+    brightness_values = np.array(
+        [
+            sky_brightness[r, c]
+            if 0 <= r < sky_brightness.shape[0] and 0 <= c < sky_brightness.shape[1]
+            else np.nan
+            for r, c in zip(spot_rows, spot_cols)
+        ]
+    )
 
-    sqm_values = np.array([
-        sqm_map[r, c] if 0 <= r < sqm_map.shape[0] and 0 <= c < sqm_map.shape[1] else np.nan
-        for r, c in zip(spot_rows, spot_cols)
-    ])
+    sqm_values = np.array(
+        [
+            sqm_map[r, c] if 0 <= r < sqm_map.shape[0] and 0 <= c < sqm_map.shape[1] else np.nan
+            for r, c in zip(spot_rows, spot_cols)
+        ]
+    )
 
     # Step 4: Elevation correction
-    if config.elevation_correction and 'ele' in spots.columns:
-        elevation = pd.to_numeric(spots['ele'], errors='coerce').fillna(0).values
+    if config.elevation_correction and "ele" in spots.columns:
+        elevation = pd.to_numeric(spots["ele"], errors="coerce").fillna(0).values
         sqm_values = apply_elevation_correction(sqm_values, elevation)
-        logger.info("Applied elevation correction (mean ele: %.0fm)", np.mean(elevation[elevation > 0]))
+        logger.info(
+            "Applied elevation correction (mean ele: %.0fm)", np.mean(elevation[elevation > 0])
+        )
 
     # Step 5: Classify
     bortle_values = np.array([int(sqm_to_bortle(np.array([s]))[0]) for s in sqm_values])
     quality_values = [classify_stargazing_quality(s) for s in sqm_values]
 
     # Store results
-    spots['predicted_brightness_mcd'] = np.round(brightness_values, 2)
-    spots['predicted_sqm'] = np.round(sqm_values, 2)
-    spots['predicted_bortle'] = bortle_values
-    spots['stargazing_suitability'] = quality_values
+    spots["predicted_brightness_mcd"] = np.round(brightness_values, 2)
+    spots["predicted_sqm"] = np.round(sqm_values, 2)
+    spots["predicted_bortle"] = bortle_values
+    spots["stargazing_suitability"] = quality_values
 
     # Log summary
-    for quality in ['excellent', 'good', 'acceptable', 'poor', 'urban']:
+    for quality in ["excellent", "good", "acceptable", "poor", "urban"]:
         count = quality_values.count(quality)
         if count > 0:
             logger.info("  %s: %d spots", quality, count)
