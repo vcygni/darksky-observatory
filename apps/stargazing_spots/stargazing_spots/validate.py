@@ -137,6 +137,25 @@ def _metrics(pred, obs) -> dict:
     return out
 
 
+def group_tess_by_pixel(
+    tess: list[dict], sqm_map: np.ndarray, x_coords: np.ndarray, y_coords: np.ndarray
+) -> tuple[dict[tuple[int, int], list[dict]], list[str]]:
+    """TESS sites keyed by model pixel, plus stations outside the raster or on nodata.
+
+    Sites in one pixel are averaged downstream so a location is not counted twice.
+    Shared by validation and scripts/fit_calibration.py so both use the same sample.
+    """
+    by_pixel: dict[tuple[int, int], list[dict]] = {}
+    outside = []
+    for s in tess:
+        idx = _pixel_index(x_coords, y_coords, s["lat"], s["lon"])
+        if idx is None or np.isnan(sqm_map[idx]):
+            outside.append(s["station"])
+            continue
+        by_pixel.setdefault(idx, []).append(s)
+    return by_pixel, outside
+
+
 # --- Validation ---------------------------------------------------------------------
 
 
@@ -152,14 +171,7 @@ def run_validation(
     # 1. TESS (primary)
     tess = _load_tess_sites()
     if tess:
-        by_pixel: dict[tuple[int, int], list[dict]] = {}
-        outside = []
-        for s in tess:
-            idx = _pixel_index(x_coords, y_coords, s["lat"], s["lon"])
-            if idx is None or np.isnan(sqm_map[idx]):
-                outside.append(s["station"])
-                continue
-            by_pixel.setdefault(idx, []).append(s)
+        by_pixel, outside = group_tess_by_pixel(tess, sqm_map, x_coords, y_coords)
         rows = []
         for idx, sites in sorted(by_pixel.items()):
             rows.append(

@@ -17,3 +17,5 @@ services:
       context: ./apps/stargazing_spots
       dockerfile: Dockerfile
       target: test
+    volumes:
+      - ./validation:/app/validation:ro

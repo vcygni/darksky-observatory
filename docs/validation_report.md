@@ -1,92 +1,109 @@
-# Validation Report (v0.7.0)
+# Validation Report
 
-658 spots, SSI >= 65. Validated against 4 independent sources (1,935 points).
+Generated 2026-11-16 from `apps/stargazing_spots/output/portugal/validation_report.json`
+(`make validate`) and `validation/portugal/calibration_loo.json`
+(`scripts/fit_calibration.py`). Model: PSF skyglow, `CALIB_FACTOR = 0.04237`, 658 spots.
+Notebook `notebooks/portugal/03_validation.ipynb` displays the same files.
 
-| Source | N | MAE (mag) | Bias (mag) | Correlation |
-|--------|---|-----------|------------|-------------|
-| Published SQM | 7 | 0.286 | -0.021 | -- |
-| TESS (best-night max) | 8 | 0.268 | +0.185 | 0.99 |
-| darkskysites.com grid | 1,920 | 0.473 | +0.472 | 0.937 |
-| Expert detection | 20 | -- | -- | 100% within 10km |
-| **Cross-source mean** | **1,935** | **0.342** | | |
+| Role | Source | N | Used for |
+|------|--------|---|----------|
+| Primary | TESS photometers, clear-sky moonless zenith | 16 pixels | accuracy |
+| Indicative | Published SQM sites passing the audit | 2 | reported separately, not a baseline |
+| Model inter-comparison | darkskysites.com grid | 1,729 | consistency with another VIIRS model, **not validation** |
+| Descriptive | Official observation points | 18 | distance to nearest spot |
 
-## Published SQM (7 sites)
+No MAE is pooled across sources.
 
-Sources: Lima et al. 2016, IDA certification 2018, Barbosa et al. 2024, Lima 2015 PhD, Dark Sky Alqueva network.
+## Primary: TESS clear-sky (16 pixels)
 
-| Metric | Value |
-|--------|-------|
-| MAE | 0.286 mag |
-| Bias | -0.021 mag |
-| Max error | 0.666 mag |
-| Sites within +/- 0.5 mag | 6/7 |
+Observed value: mode of the dark (Sun < −18°), moonless (Moon < 0°) readings per
+site, from `scripts/derive_tess_clear_sky.py`. Sites sharing a model pixel are
+averaged.
 
-## TESS Network (8 stations)
+| Metric | vs KDE mode | vs median (sensitivity) |
+|--------|-------------|-------------------------|
+| MAE (mag) | 0.683 | 0.779 |
+| Bias, predicted − observed (mag) | +0.552 | +0.730 |
+| RMSE (mag) | 0.857 | 0.939 |
+| Max abs error (mag) | 2.375 | 2.401 |
+| Pearson r | 0.736 | 0.793 |
+| Spearman ρ | 0.603 | 0.609 |
 
-Comparison against best-night maximum SQM (July 2020) from the Stars4All TESS-W network.
+Positive bias: the model predicts darker skies than TESS measures at 14 of 16 pixels.
 
-| Metric | Value |
-|--------|-------|
-| MAE (vs max) | 0.268 mag |
-| Pearson r | 0.99 |
+**Sample.** 20 stations → 21 sites (stars218 moved) → 16 pixels inside the raster.
+Outside the raster: stars218 (one of its two positions), stars384, stars387. stars66
+has no usable file (all 38 marked uncalibrated by the supplier). 15 pixels are in
+Spain (Extremadura, mostly town halls and cultural centres); 1 is in Portugal
+(Porto, stars40 + stars41 on one building).
 
-## darkskysites.com Grid (1,920 points)
+| Largest errors | Observed | Predicted | Error |
+|----------------|----------|-----------|-------|
+| Olivenza (stars271; two location names at one position) | 19.28 | 21.65 | +2.38 |
+| San Benito de la Contienda (stars332) | 20.43 | 21.47 | +1.04 |
+| Alconchel (stars320) | 19.41 | 20.43 | +1.02 |
+| Porto (stars40/41) | 18.21 | 17.52 | −0.68 |
 
-Comparison against the LUMIX Garstang-class full RT engine at 0.1-degree spacing.
+## Calibration check
 
-| Metric | Value |
-|--------|-------|
-| MAE | 0.473 mag |
-| Bias | +0.472 mag |
-| Pearson r | 0.937 |
-| Points within +/- 1.0 mag | 98.4% |
+`CALIB_FACTOR` is the model's only free scale. The previous documentation said it was
+fitted to 27 ground-truth points (MAE 0.48 mag); no fitting code or point list for
+that fit is in the repository. `scripts/fit_calibration.py` refits it on the TESS
+pixels and estimates held-out error by leave-one-out (fit on 15, predict the 16th).
 
-The +0.47 mag offset reflects physics limitations of the simplified single-scatter PSF vs LUMIX's multiple scattering, non-isotropic emission, and CAMS aerosol ingestion.
+| | CALIB_FACTOR | MAE | Bias | RMSE | Pearson r |
+|---|---|---|---|---|---|
+| Current constant | 0.04237 | 0.683 | +0.552 | 0.857 | 0.736 |
+| In-sample fit | 0.07467 | 0.555 | +0.139 | 0.755 | 0.722 |
+| Leave-one-out | 0.0676–0.0876 | **0.593** | +0.130 | 0.798 | 0.712 |
 
-## Expert Detection (20 spots)
+The leave-one-out MAE (0.593 mag) is the estimate of error at an unseen site. The
+refit factor is 1.76× the current one; it is **not** adopted, because it would change
+every published spot. Restricted to the 4 pixels as dark as the spots being ranked
+(observed ≥ 20.5): MAE 0.522 / bias +0.341 with the current constant, 0.451 / +0.008
+leave-one-out.
 
-| Metric | Value |
-|--------|-------|
-| Detected within 5 km | 70% |
-| Detected within 10 km | 100% |
-| Mean distance to nearest spot | 4.4 km |
+## Indicative: published SQM (2 sites)
 
-## PSF Model
+| Site | Published | Predicted |
+|------|-----------|-----------|
+| Dark Sky Alqueva Observatory (Cumeada) | 21.43 | 21.649 |
+| Peneda-Gerês (Porta do Mezio) | 21.30 | 21.463 |
 
-```
-PSF(d) = (d + 1.0)^(-2.5) * exp(-0.0187 * d)
-```
+MAE 0.191, bias +0.191 mag. The other 5 measured sites are excluded:
+`validation/portugal/published_sites_audit.csv` gives the reason for each
+(unverifiable value or certification, wrong or unknown coordinates).
 
-CALIB_FACTOR = 0.04237, fitted against 27 ground-truth points spanning SQM 18.3-21.6. Duriscoe softening (d_0 = 1km) eliminates suburban over-prediction artefacts from v0.5.0.
+## Model inter-comparison: darkskysites.com (not validation)
 
-## SSI Weight Robustness
+n = 1,729, MAE 0.244, bias +0.177, RMSE 0.285 mag, Pearson r 0.970, Spearman ρ 0.959.
+Both models are driven by VIIRS radiance, so this shows agreement with another model,
+not accuracy against the sky. n is below the 1,920 grid points because points outside
+the model raster are no longer sampled (they were clamped to the edge pixel).
 
-| Perturbation | Spearman rho vs baseline |
-|--------------|--------------------------|
-| Each weight +/-50% | > 0.97 |
-| All-equal weights (1/6) | 0.89 |
+## Descriptive: official observation points
 
-## Flagged Spots
+Distance from each of 18 official/public observation points to the nearest pipeline
+spot: median 4.2 km, max 31.9 km.
 
-14 spots diverge >1 mag from the LUMIX reference (all predicting darker). Common characteristics: proximity to moderate towns (10-30km), valley locations, coastal sites with marine aerosol.
+## Retired figures
+
+| Earlier claim | Status |
+|---------------|--------|
+| "4 independent sources (1,935 points)", cross-source MAE 0.342 | pooled a VIIRS-based model (1,920 points) with 15 observations; not reproducible |
+| Pearson r = 0.937 / 0.949 "validation" | darkskysites.com model inter-comparison, not validation (now r = 0.970) |
+| Published SQM MAE 0.286 (7 sites) | from a model version not in the repository; 5 of 7 sites fail the audit |
+| TESS MAE 0.268 (8 stations, best-night max) | best-night maximum is not the clear-sky value the model predicts; replaced by the KDE mode |
+| SSI weight robustness (Spearman ρ > 0.97) and 14 flagged spots | no code in the repository produces them; removed |
 
 ## Limitations
 
-1. Systematic +/-0.5 mag uncertainty vs full Garstang RT
-2. Only 7+8 truly independent quantitative validation points for Portugal
-3. Temporal mismatch between ground-truth (2015-2024) and VIIRS (2023-2025)
-4. PSF sensitive to position at 500m scale near bright sources
-5. Fixed extinction coefficient (beta = 0.0187) across entire domain
-6. Calibration specific to Portuguese atmospheric conditions
-
-## References
-
-1. Lima, R.C. et al. (2016). J. Tox. Environ. Health A, 79(7), 307-319.
-2. Barbosa, D. et al. (2024). arXiv:2404.04090.
-3. IDA (2018). Castle of Noudar certification report.
-4. Falchi, F. et al. (2016). Science Advances 2(6), e1600377.
-5. Duriscoe, D.M. et al. (2018). JQSRT 214, 133-145.
-
----
-
-*Pipeline v0.7.0. Validation data: `apps/stargazing_spots/output/portugal/validation_report.json`.*
+1. The TESS sample is 15 Spanish town sites and 1 Porto building. Only 4 pixels are
+   in the darkness range of the ranked spots (predicted SQM 20.56–22.06).
+2. The model has 500 m pixels; a photometer on a town building also sees local lights
+   that the pixel average does not resolve.
+3. TESS-W and SQM have different passbands; no conversion is applied.
+4. Temporal mismatch: TESS readings 2019–2025, VIIRS composite 2023–2025.
+5. Single-scatter PSF: ±0.5 mag systematic uncertainty against full radiative transfer.
+6. Raw TESS files (732 MB) are not in the repository; `tess_clear_sky.json` is, with
+   the derivation script and log.

@@ -22,7 +22,7 @@ test:
 	uv run python -m pytest apps/stargazing_spots/tests/ -v
 
 lint:
-	uv run ruff check apps/stargazing_spots/ scripts/
+	uv run ruff check apps/stargazing_spots/ scripts/ notebooks/
 	uv run ruff format --check apps/stargazing_spots/ scripts/
 
 format:

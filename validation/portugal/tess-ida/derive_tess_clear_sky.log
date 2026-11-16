@@ -1,17 +1,23 @@
-/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
-  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
 stars201   38.75550   -6.98450 dark+moonless   219347 readings  843 nights  mode  20.59  median  20.45  Finca La Cocosa / Badajoz / Badajoz / Un
-/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
-  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
 stars218   38.18984   -5.95709 dark+moonless   124616 readings  381 nights  mode  21.16  median  20.98  Alcazaba de la Reina / Extremadura / Unk
-/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
-  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
 stars218   39.10950   -6.68920 dark+moonless   135804 readings  508 nights  mode  21.11  median  21.06  La Roca de la Sierra / La Roca de la Sie
-/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
-  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
 stars271   38.74278   -7.21000 dark+moonless    89099 readings  292 nights  mode  18.91  median  18.96  Olivenza / Olivenza / Badajoz / Unknown 
-/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
-  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
 stars271   38.74278   -7.20999 dark+moonless    97059 readings  313 nights  mode  19.64  median  19.54  Puerto Villareal / Olivenza / Unknown / 
-/home/cygniv404/astrotraveler/darksky-observatory/apps/stargazing_spots/../../scripts/derive_tess_clear_sky.py:129: FutureWarning: The behavior of DatetimeProperties.to_pydatetime is deprecated, in a future version this will return a Series containing python datetime objects instead of an ndarray. To retain the old behavior, call `np.array` on the result
-  t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
+stars288   38.21970   -6.63180 dark+moonless   506730 readings 1683 nights  mode  21.15  median  21.09  Entre Encinas y Estrellas / Fregenal de 
+stars316   38.52855   -7.01651 dark+moonless    67522 readings  233 nights  mode  20.89  median  20.53  Casa de la Cultura / Táliga / Llanos de 
+stars319   38.32894   -6.95169 dark+moonless    65298 readings  211 nights  mode  20.24  median  20.16  Torreón / Zahínos / Sierra Suroeste, Bad
+stars320   38.51671   -7.07078 dark+moonless    44528 readings  160 nights  mode  19.41  median  19.29  Ayuntamiento / Alconchel / Llanos de Oli
+stars321   38.36618   -6.78923 dark+moonless    63291 readings  216 nights  mode  20.14  median  20.02  Centro de formación Polivalente / Valle 
+stars322   38.51406   -6.84958 dark+moonless    39088 readings  139 nights  mode  20.17  median  19.56  Ayuntamiento / Barcarrota / Badajoz / Ex
+stars323   38.16630   -6.65606 dark+moonless    63229 readings  213 nights  mode  19.87  median  19.73  Centro Municipal Nertobriga / Fregenal d
+stars324   38.51115   -7.27922 dark+moonless    64040 readings  222 nights  mode  20.45  median  20.37  Casa de la cultura / Cheles / Llanos de 
+stars325   38.68448   -7.10590 dark+moonless    48907 readings  181 nights  mode  19.89  median  19.79  Residencia de mayores Virgen de Guadalup
+stars327   38.06817   -6.53929 dark+moonless    51590 readings  196 nights  mode  20.16  median  20.00  Biblioteca Municipal "Cronista Andrés Be
+stars328   38.27697   -6.91978 dark+moonless     9581 readings  116 nights  mode  20.04  median  19.90  Ayuntamiento / Oliva de la Frontera / Si
+stars332   38.63231   -7.15781 dark+moonless    56106 readings  203 nights  mode  20.43  median  20.38  Centro Cultural / San Benito de la Conti
+stars384   40.27020   -6.10422 dark+moonless     4831 readings   64 nights  mode  20.93  median  20.94  Granadilla / Zarza de Granadilla / Unkno
+stars387   40.16427   -6.09943 dark+moonless    36041 readings  180 nights  mode  21.21  median  21.09  Centro de Interpretación de Cáparra / Ol
+stars40    41.17742   -8.60596 dark+moonless   383172 readings 1563 nights  mode  18.09  median  17.52  Escola Superior de Saúde do Politécnico 
+stars41    41.17742   -8.60596 dark+moonless   385612 readings 1575 nights  mode  18.32  median  17.70  Escola Superior de Saúde do Politécnico 
+wrote validation/portugal/tess-ida/tess_clear_sky.json: 21 sites; uncalibrated files excluded: {'stars218': 13, 'stars271': 3, 'stars322': 1, 'stars66': 38}
+real	12m54.634s

@@ -42,6 +42,7 @@ OUTPUT = TESS_DIR / "tess_clear_sky.json"
 SUN_MAX_ALT = -18.0
 MOON_MAX_ALT = 0.0
 KDE_GRID_STEP = 0.005
+ALT_CHUNK = 50_000  # readings per Skyfield call (bounds memory)
 
 
 def read_header(path: Path) -> dict:
@@ -89,6 +90,26 @@ def kde_mode(values: np.ndarray) -> float:
     return float(centres[np.argmax(density)])
 
 
+def dark_moonless_mask(ts, observer, sun, moon, utc: pd.Series) -> np.ndarray:
+    """Sun < SUN_MAX_ALT and Moon < MOON_MAX_ALT, evaluated in chunks.
+
+    Skyfield allocates several (3, N) float64 arrays per observe/apparent call;
+    one call over a whole station reached 13 GB RSS and exhausted swap.
+    Chunking gives identical results with bounded memory.
+    """
+    times = np.asarray(utc.dt.to_pydatetime())  # ndarray on current and future pandas
+    out = np.empty(len(times), dtype=bool)
+    for start in range(0, len(times), ALT_CHUNK):
+        t = ts.from_datetimes(times[start : start + ALT_CHUNK])
+        here = observer.at(t)
+        sun_alt = here.observe(sun).apparent().altaz()[0].degrees
+        moon_alt = here.observe(moon).apparent().altaz()[0].degrees
+        out[start : start + ALT_CHUNK] = (sun_alt < SUN_MAX_ALT) & (
+            moon_alt < MOON_MAX_ALT
+        )
+    return out
+
+
 def main() -> None:
     load = Loader(str(EPHEMERIS_DIR))
     eph = load("de421.bsp")
@@ -126,13 +147,10 @@ def main() -> None:
             .drop_duplicates("utc")
             .sort_values("utc")
         )
-        t = ts.from_datetimes(df["utc"].dt.to_pydatetime())
         observer = earth + wgs84.latlon(
             lat, lon, elevation_m=ele or 0.0
         )  # missing ele: 0 m
-        sun_alt = observer.at(t).observe(sun).apparent().altaz()[0].degrees
-        moon_alt = observer.at(t).observe(moon).apparent().altaz()[0].degrees
-        dark = (sun_alt < SUN_MAX_ALT) & (moon_alt < MOON_MAX_ALT)
+        dark = dark_moonless_mask(ts, observer, sun, moon, df["utc"])
         values = df.loc[dark, "msas"].to_numpy()
         nights = (
             df.loc[dark, "utc"]

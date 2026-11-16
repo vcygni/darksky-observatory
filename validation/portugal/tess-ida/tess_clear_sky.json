@@ -1,0 +1,411 @@
+{
+ "method": {
+  "sun_max_alt_deg": -18.0,
+  "moon_max_alt_deg": 0.0,
+  "ephemeris": "JPL DE421 via Skyfield",
+  "estimator": "mode of Gaussian KDE (Scott's rule), binned at 0.005 mag",
+  "excluded": "files flagged 'may not have been calibrated' by the supplier; files with no header position; MSAS <= 0",
+  "script": "scripts/derive_tess_clear_sky.py"
+ },
+ "excluded_uncalibrated_files": {
+  "stars218": 13,
+  "stars271": 3,
+  "stars322": 1,
+  "stars66": 38
+ },
+ "excluded_files_without_position": {
+  "stars201": 23,
+  "stars271": 4,
+  "stars288": 5,
+  "stars384": 15,
+  "stars387": 3
+ },
+ "sites": [
+  {
+   "station": "stars201",
+   "location": "Finca La Cocosa / Badajoz / Badajoz / Unknown / Spain",
+   "lat": 38.7555,
+   "lon": -6.9845,
+   "ele_m": 313.0,
+   "files": 51,
+   "zero_points": [
+    20.3,
+    20.31,
+    20.55
+   ],
+   "readings_total": 625362,
+   "readings_dark_moonless": 219347,
+   "nights_dark_moonless": 843,
+   "first": "2019-01-30T17:48:21+00:00",
+   "last": "2025-12-31T07:38:15+00:00",
+   "clear_sky_sqm_mode": 20.59,
+   "sqm_median": 20.45
+  },
+  {
+   "station": "stars218",
+   "location": "Alcazaba de la Reina / Extremadura / Unknown / Unknown / Spain",
+   "lat": 38.189844,
+   "lon": -5.957093,
+   "ele_m": 637.0,
+   "files": 17,
+   "zero_points": [
+    20.3,
+    20.36
+   ],
+   "readings_total": 319914,
+   "readings_dark_moonless": 124616,
+   "nights_dark_moonless": 381,
+   "first": "2022-09-12T22:51:12+00:00",
+   "last": "2024-01-18T17:32:09+00:00",
+   "clear_sky_sqm_mode": 21.165,
+   "sqm_median": 20.98
+  },
+  {
+   "station": "stars218",
+   "location": "La Roca de la Sierra / La Roca de la Sierra / Badajoz / Unknown / Spain",
+   "lat": 39.1095,
+   "lon": -6.6892,
+   "ele_m": 248.0,
+   "files": 24,
+   "zero_points": [
+    20.35
+   ],
+   "readings_total": 389657,
+   "readings_dark_moonless": 135804,
+   "nights_dark_moonless": 508,
+   "first": "2020-02-05T17:43:24+00:00",
+   "last": "2022-03-08T16:02:56+00:00",
+   "clear_sky_sqm_mode": 21.114,
+   "sqm_median": 21.06
+  },
+  {
+   "station": "stars271",
+   "location": "Olivenza / Olivenza / Badajoz / Unknown / Spain",
+   "lat": 38.74278,
+   "lon": -7.21,
+   "ele_m": 149.0,
+   "files": 21,
+   "zero_points": [
+    20.35,
+    20.46
+   ],
+   "readings_total": 243420,
+   "readings_dark_moonless": 89099,
+   "nights_dark_moonless": 292,
+   "first": "2019-02-08T18:04:19+00:00",
+   "last": "2021-11-19T21:37:43+00:00",
+   "clear_sky_sqm_mode": 18.914,
+   "sqm_median": 18.96
+  },
+  {
+   "station": "stars271",
+   "location": "Puerto Villareal / Olivenza / Unknown / Unknown / Spain",
+   "lat": 38.742784,
+   "lon": -7.2099855,
+   "ele_m": 149.0,
+   "files": 13,
+   "zero_points": [
+    20.3
+   ],
+   "readings_total": 264177,
+   "readings_dark_moonless": 97059,
+   "nights_dark_moonless": 313,
+   "first": "2023-10-01T00:00:27+00:00",
+   "last": "2024-10-22T07:05:06+00:00",
+   "clear_sky_sqm_mode": 19.637,
+   "sqm_median": 19.54
+  },
+  {
+   "station": "stars288",
+   "location": "Entre Encinas y Estrellas / Fregenal de la Sierra / Unknown / Unknown / Spain",
+   "lat": 38.2197,
+   "lon": -6.6318,
+   "ele_m": 492.0,
+   "files": 75,
+   "zero_points": [
+    20.3,
+    20.37,
+    20.47
+   ],
+   "readings_total": 1350622,
+   "readings_dark_moonless": 506730,
+   "nights_dark_moonless": 1683,
+   "first": "2019-01-27T17:52:30+00:00",
+   "last": "2025-12-31T07:59:34+00:00",
+   "clear_sky_sqm_mode": 21.152,
+   "sqm_median": 21.09
+  },
+  {
+   "station": "stars316",
+   "location": "Casa de la Cultura / Táliga / Llanos de Olivenza / Extremadura / Spain",
+   "lat": 38.528546,
+   "lon": -7.016506,
+   "ele_m": 0.0,
+   "files": 11,
+   "zero_points": [
+    20.32
+   ],
+   "readings_total": 180575,
+   "readings_dark_moonless": 67522,
+   "nights_dark_moonless": 233,
+   "first": "2020-01-14T17:20:18+00:00",
+   "last": "2020-11-19T07:22:26+00:00",
+   "clear_sky_sqm_mode": 20.885,
+   "sqm_median": 20.53
+  },
+  {
+   "station": "stars319",
+   "location": "Torreón / Zahínos / Sierra Suroeste, Badajoz / Extremadura / Spain",
+   "lat": 38.32894,
+   "lon": -6.951691,
+   "ele_m": 0.0,
+   "files": 11,
+   "zero_points": [
+    20.3
+   ],
+   "readings_total": 174843,
+   "readings_dark_moonless": 65298,
+   "nights_dark_moonless": 211,
+   "first": "2020-01-08T17:03:34+00:00",
+   "last": "2021-03-05T05:53:14+00:00",
+   "clear_sky_sqm_mode": 20.238,
+   "sqm_median": 20.16
+  },
+  {
+   "station": "stars320",
+   "location": "Ayuntamiento / Alconchel / Llanos de Olivenza / Extremadura / Spain",
+   "lat": 38.516705,
+   "lon": -7.070783,
+   "ele_m": 0.0,
+   "files": 12,
+   "zero_points": [
+    20.33
+   ],
+   "readings_total": 127194,
+   "readings_dark_moonless": 44528,
+   "nights_dark_moonless": 160,
+   "first": "2020-02-05T08:47:18+00:00",
+   "last": "2021-06-02T23:01:36+00:00",
+   "clear_sky_sqm_mode": 19.414,
+   "sqm_median": 19.29
+  },
+  {
+   "station": "stars321",
+   "location": "Centro de formación Polivalente / Valle de Santa Ana / Sierra Suroeste / Extremadura / Spain",
+   "lat": 38.366184,
+   "lon": -6.789225,
+   "ele_m": 0.0,
+   "files": 11,
+   "zero_points": [
+    20.25
+   ],
+   "readings_total": 165067,
+   "readings_dark_moonless": 63291,
+   "nights_dark_moonless": 216,
+   "first": "2019-12-23T16:46:34+00:00",
+   "last": "2020-10-02T07:01:09+00:00",
+   "clear_sky_sqm_mode": 20.143,
+   "sqm_median": 20.02
+  },
+  {
+   "station": "stars322",
+   "location": "Ayuntamiento / Barcarrota / Badajoz / Extremadura / Spain",
+   "lat": 38.514058,
+   "lon": -6.849581,
+   "ele_m": 459.0,
+   "files": 9,
+   "zero_points": [
+    20.34
+   ],
+   "readings_total": 103964,
+   "readings_dark_moonless": 39088,
+   "nights_dark_moonless": 139,
+   "first": "2020-02-05T17:37:56+00:00",
+   "last": "2020-11-06T15:11:17+00:00",
+   "clear_sky_sqm_mode": 20.168,
+   "sqm_median": 19.56
+  },
+  {
+   "station": "stars323",
+   "location": "Centro Municipal Nertobriga / Fregenal de la Sierra / Sierra Suroeste, Badajoz / Extremadura / Spain",
+   "lat": 38.166303,
+   "lon": -6.656062,
+   "ele_m": 0.0,
+   "files": 10,
+   "zero_points": [
+    20.39
+   ],
+   "readings_total": 168313,
+   "readings_dark_moonless": 63229,
+   "nights_dark_moonless": 213,
+   "first": "2019-12-23T16:50:50+00:00",
+   "last": "2020-09-17T22:04:09+00:00",
+   "clear_sky_sqm_mode": 19.873,
+   "sqm_median": 19.73
+  },
+  {
+   "station": "stars324",
+   "location": "Casa de la cultura / Cheles / Llanos de Olivenza / Extremadura / Spain",
+   "lat": 38.511152,
+   "lon": -7.279224,
+   "ele_m": 0.0,
+   "files": 10,
+   "zero_points": [
+    20.37
+   ],
+   "readings_total": 173406,
+   "readings_dark_moonless": 64040,
+   "nights_dark_moonless": 222,
+   "first": "2019-12-26T17:03:32+00:00",
+   "last": "2020-09-17T11:55:30+00:00",
+   "clear_sky_sqm_mode": 20.453,
+   "sqm_median": 20.37
+  },
+  {
+   "station": "stars325",
+   "location": "Residencia de mayores Virgen de Guadalupe / Olivenza / Llanos de Olivenza / Extremadura / Spain",
+   "lat": 38.6844841,
+   "lon": -7.1059006,
+   "ele_m": 0.0,
+   "files": 10,
+   "zero_points": [
+    20.32
+   ],
+   "readings_total": 138234,
+   "readings_dark_moonless": 48907,
+   "nights_dark_moonless": 181,
+   "first": "2019-10-01T08:37:45+00:00",
+   "last": "2020-09-17T06:34:15+00:00",
+   "clear_sky_sqm_mode": 19.893,
+   "sqm_median": 19.79
+  },
+  {
+   "station": "stars327",
+   "location": "Biblioteca Municipal \"Cronista Andrés Bernáldez\" / Fuentes de León / Badajoz / Extremadura / Spain",
+   "lat": 38.068173,
+   "lon": -6.539288,
+   "ele_m": 0.0,
+   "files": 12,
+   "zero_points": [
+    20.31
+   ],
+   "readings_total": 157209,
+   "readings_dark_moonless": 51590,
+   "nights_dark_moonless": 196,
+   "first": "2020-01-30T17:26:54+00:00",
+   "last": "2020-12-15T07:28:43+00:00",
+   "clear_sky_sqm_mode": 20.157,
+   "sqm_median": 20.0
+  },
+  {
+   "station": "stars328",
+   "location": "Ayuntamiento / Oliva de la Frontera / Sierra Suroeste, Badajoz / Extremadura / Spain",
+   "lat": 38.276969,
+   "lon": -6.91978,
+   "ele_m": 0.0,
+   "files": 10,
+   "zero_points": [
+    20.32
+   ],
+   "readings_total": 26283,
+   "readings_dark_moonless": 9581,
+   "nights_dark_moonless": 116,
+   "first": "2020-01-30T02:24:37+00:00",
+   "last": "2020-10-02T02:36:50+00:00",
+   "clear_sky_sqm_mode": 20.04,
+   "sqm_median": 19.9
+  },
+  {
+   "station": "stars332",
+   "location": "Centro Cultural / San Benito de la Contienda / Llanos de Olivenza / Extremadura / Spain",
+   "lat": 38.6323061,
+   "lon": -7.1578057,
+   "ele_m": 0.0,
+   "files": 10,
+   "zero_points": [
+    20.37
+   ],
+   "readings_total": 155238,
+   "readings_dark_moonless": 56106,
+   "nights_dark_moonless": 203,
+   "first": "2020-01-30T17:52:01+00:00",
+   "last": "2020-10-20T00:29:19+00:00",
+   "clear_sky_sqm_mode": 20.429,
+   "sqm_median": 20.38
+  },
+  {
+   "station": "stars384",
+   "location": "Granadilla / Zarza de Granadilla / Unknown / Unknown / Spain",
+   "lat": 40.2702,
+   "lon": -6.104225,
+   "ele_m": 383.0,
+   "files": 13,
+   "zero_points": [
+    20.3,
+    20.36
+   ],
+   "readings_total": 25954,
+   "readings_dark_moonless": 4831,
+   "nights_dark_moonless": 64,
+   "first": "2020-10-06T15:47:48+00:00",
+   "last": "2024-04-14T17:24:18+00:00",
+   "clear_sky_sqm_mode": 20.933,
+   "sqm_median": 20.94
+  },
+  {
+   "station": "stars387",
+   "location": "Centro de Interpretación de Cáparra / Oliva de Plasencia / Unknown / Unknown / Spain",
+   "lat": 40.164273,
+   "lon": -6.099435,
+   "ele_m": 413.0,
+   "files": 14,
+   "zero_points": [
+    20.0,
+    20.39
+   ],
+   "readings_total": 98419,
+   "readings_dark_moonless": 36041,
+   "nights_dark_moonless": 180,
+   "first": "2020-02-25T10:03:21+00:00",
+   "last": "2022-11-24T01:16:37+00:00",
+   "clear_sky_sqm_mode": 21.206,
+   "sqm_median": 21.09
+  },
+  {
+   "station": "stars40",
+   "location": "Escola Superior de Saúde do Politécnico do Porto / Porto / Unknown / Unknown / Portugal",
+   "lat": 41.1774241,
+   "lon": -8.6059636,
+   "ele_m": 114.0,
+   "files": 69,
+   "zero_points": [
+    20.38
+   ],
+   "readings_total": 1071555,
+   "readings_dark_moonless": 383172,
+   "nights_dark_moonless": 1563,
+   "first": "2019-01-01T00:01:40+00:00",
+   "last": "2025-03-11T03:16:47+00:00",
+   "clear_sky_sqm_mode": 18.094,
+   "sqm_median": 17.52
+  },
+  {
+   "station": "stars41",
+   "location": "Escola Superior de Saúde do Politécnico do Porto / Porto / Unknown / Unknown / Portugal",
+   "lat": 41.1774241,
+   "lon": -8.6059636,
+   "ele_m": 114.0,
+   "files": 69,
+   "zero_points": [
+    20.42
+   ],
+   "readings_total": 1091853,
+   "readings_dark_moonless": 385612,
+   "nights_dark_moonless": 1575,
+   "first": "2019-01-01T00:04:33+00:00",
+   "last": "2025-02-06T02:28:58+00:00",
+   "clear_sky_sqm_mode": 18.319,
+   "sqm_median": 17.7
+  }
+ ]
+}

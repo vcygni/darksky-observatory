@@ -43,7 +43,7 @@ jobs:
 
       - name: Lint with ruff
         run: |
-          uv run ruff check apps/stargazing_spots/ scripts/
+          uv run ruff check apps/stargazing_spots/ scripts/ notebooks/
           uv run ruff format --check apps/stargazing_spots/ scripts/
 
       - name: Run tests

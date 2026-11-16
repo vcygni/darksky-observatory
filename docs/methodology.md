@@ -67,7 +67,7 @@ PSF(d) = (d + d_0)^(-2.5) * exp(-beta * d)
 | beta | 0.0187 km^-1 | Atmospheric extinction |
 | Exponent | -2.5 | Walker (1977), Cinzano (2001) |
 | Radius | 200 km | |
-| CALIB_FACTOR | 0.04237 | Fitted against 27 ground-truth points |
+| CALIB_FACTOR | 0.04237 | Origin not reproducible (see §15); leave-one-out check in `scripts/fit_calibration.py` |
 
 SQM conversion:
 ```
@@ -188,7 +188,7 @@ Each spot gets the nearest point on a road a car can legally use **and stop on**
 
 Spots beyond the threshold get `access_kind = "none"` and are not offered as drive-to destinations. Output fields: `access_kind`, `access_lat/lon` (road point), `access_walk_m`, `access_climb_m` (net climb from Copernicus GLO-30, informational: DSM includes trees/structures), `access_road_type`.
 
-Result (2026-10-06 extract): 320 of 658 spots accessible (mainland 243/555, Madeira 25/35, Azores 52/68); walk median 70 m. Coverage of the guide (3 nearest accessible spots, ≥15 km apart, search ≤150 km) over 4,264 OSM cities/towns/villages: 99.7 % get 3 spots; farthest of the 3 median 26 km, max 98 km (Flores/Corvo get 1).
+Result (current output, OSM extract timestamp 2026-10-06T20:21:06Z): 316 of 658 spots accessible (mainland 231/542, Madeira 26/37, Azores 59/79); walk median 67.5 m. Guide coverage (3 nearest accessible spots, ≥15 km apart, search ≤150 km, over 4,264 OSM cities/towns/villages: 99.7 % get 3 spots; farthest of the 3 median 26 km, max 98 km; Flores/Corvo get 1) was computed outside this repository on an earlier spot set (320 accessible; mainland 555, Madeira 35, Azores 68) and is not reproducible here.
 
 ---
 
@@ -225,18 +225,23 @@ Significant when |delta_R| >= 1.0 nW/cm^2/sr (~0.3-0.4 mag, approximately one Bo
 
 ## 15. Validation Summary
 
-Run with `make validate` (`scripts/run_validation.py`). Results on 2026-10-08:
+Run with `make validate` (`scripts/run_validation.py`) and `scripts/fit_calibration.py`. Results on 2026-11-16; full tables in [validation_report.md](validation_report.md).
 
-| Source | N | MAE (mag) | Correlation |
-|--------|---|-----------|-------------|
-| Published SQM (measured) | 7 | 0.620 | -- |
-| TESS (best-night max) | 20 | 0.739 | -- |
-| darkskysites.com grid | 1,920 | 0.262 | 0.949 |
-| Expert detection | 20 | -- | 20/20 within 10 km (May-candidate run) |
+| Role | Source | N | MAE (mag) | Bias (mag) | Pearson r |
+|------|--------|---|-----------|------------|-----------|
+| Primary | TESS clear-sky (KDE mode), current CALIB_FACTOR | 16 pixels | 0.683 | +0.552 | 0.736 |
+| Primary | TESS clear-sky, leave-one-out refit | 16 pixels | 0.593 | +0.130 | 0.712 |
+| Indicative | Published SQM passing the audit | 2 | 0.191 | +0.191 | -- |
+| Model inter-comparison (not validation) | darkskysites.com grid | 1,729 | 0.244 | +0.177 | 0.970 |
+| Descriptive | Official observation points to nearest spot | 18 | median 4.2 km, max 31.9 km | | |
 
-**Reproducibility note.** The report shipped with the first commit (dated 2026-05-09: published-site MAE 0.286, TESS n=8 MAE 0.268, grid MAE 0.473) cannot be reproduced with the code in this repository. Until 2026-10-08 `validate.py` pointed at a non-existent directory (`validation/portugal/portugal`), so every source was silently skipped, and `make validate` failed with an IndentationError. With both fixed, the same model gives the numbers above; the earlier figures came from a model version that is not in the repository.
+**TESS sample.** 20 stations → 21 sites → 16 pixels in the raster; 15 in Spain (Extremadura town sites), 1 in Portugal (Porto). Only 4 pixels are as dark as the ranked spots (observed ≥ 20.5).
 
-**Ground-truth corrections (2026-10-08).** Three measured sites had wrong coordinates and were corrected from OSM features/official coordinates: Cumeada observatory (~14 km off), Porta do Mezio (~20 km off; the old point is Gerês town), Monsaraz castle (~1 km off). Published-site MAE 0.649 → 0.620. "Alqueva Lake (eastern shore)" (38.20, −7.80) is Vidigueira town, ~25 km from the lake shore; its true location is unknown and it is flagged, not corrected.
+**Calibration.** `CALIB_FACTOR = 0.04237` was documented as fitted to 27 ground-truth points (MAE 0.48 mag); no fitting code or point list is in the repository. A least-squares refit on the TESS pixels gives 0.0747 (1.76×); leave-one-out MAE 0.593 mag. The constant is not changed, so published spots stay reproducible.
+
+**Reproducibility history.** The report shipped with the first commit (dated 2026-05-09: published-site MAE 0.286, TESS n=8 MAE 0.268, grid MAE 0.473, r = 0.937) cannot be reproduced with the code in this repository. Until 2026-10-08 `validate.py` pointed at a non-existent directory (`validation/portugal/portugal`), so every source was silently skipped, and `make validate` failed with an IndentationError. The 2026-10-08 figures (published MAE 0.620 over 7 sites, TESS best-night max n=20 MAE 0.739, grid r = 0.949) used sources since excluded or replaced: 5 of 7 published sites failed the audit, and the TESS clear-sky file was never written: that run stopped after 5 of 20 stations, and the same step reached 13 GB RSS when rerun (computed in chunks since 2026-11-16).
+
+**Ground-truth corrections (2026-10-08).** Three measured sites had wrong coordinates and were corrected from OSM features/official coordinates: Cumeada observatory (~14 km off), Porta do Mezio (~20 km off; the old point is Gerês town), Monsaraz castle (~1 km off). "Alqueva Lake (eastern shore)" (38.20, −7.80) is Vidigueira town, ~25 km from the lake shore; its true location is unknown and it is excluded.
 
 Systematic uncertainty: +/-0.5 mag vs full Garstang RT (single-scatter PSF omits multiple scattering, non-isotropic emission, variable aerosols).
 
@@ -254,6 +259,7 @@ Systematic uncertainty: +/-0.5 mag vs full Garstang RT (single-scatter PSF omits
 8. Density-cap grid origin depends on the data (`spots.geometry.y.min()` / `.x.min()`): adding or removing one edge spot shifts every 0.25° cell. Re-running on the 2026-10-06 OSM extract swapped 103 of 658 spots with identical SSI for the 555 kept.
 9. Candidate features are OSM nodes only (areas mapped as ways/relations are not candidates).
 10. Access threshold rests on 18 official observation points; drive times in the guide come from the public OSRM server (FOSSGIS profile, which routes tracks) while access points use the stock profile (no tracks).
+11. Primary validation rests on 16 TESS pixels, 15 of them Spanish town sites and 1 in Porto; only 4 are as dark as the ranked spots. TESS-W and SQM passbands differ; no conversion is applied.
 
 ---
 

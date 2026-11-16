@@ -9,7 +9,7 @@ Ground-truth datasets used to validate the PSF skyglow model and pipeline output
 | `stargazing_sites.csv` | 33 | SQM measurements | Published + certified dark-sky sites |
 | `expert_recommended_spots.csv` | 20 | Locations | Astrotourism-recommended spots |
 | `darkskysites/` | 1,920 | SQM grid | darkskysites.com VIIRS-based reference model |
-| `tess-ida/` | 20 stations | Continuous monitoring | Stars4All TESS photometer network (6.4M readings) |
+| `tess-ida/` | 21 sites (20 stations) | Continuous monitoring | Stars4All TESS photometers, 19 sites in Spain, 2 in Portugal |
 | `official_observation_points.csv` | 18 | Locations | Official/public stargazing observation points with exact positions (access-point threshold) |
 
 ## stargazing_sites.csv
@@ -18,8 +18,8 @@ Ground-truth datasets used to validate the PSF skyglow model and pipeline output
 
 | Tier | Count | Description | Use |
 |------|-------|-------------|-----|
-| `measured` | 7 | Peer-reviewed SQM field measurements | Primary validation (MAE computation) |
-| `certification_threshold` | 10 | Starlight Foundation certified >= 21.0 | Binary detection validation |
+| `measured` | 7 | Published SQM field measurements | Indicative only: 2 pass `published_sites_audit.csv`, 5 excluded |
+| `certification_threshold` | 10 | Starlight Foundation certified >= 21.0 | Threshold analysis in `sensitivity.py` only; not used by `validate.py` |
 | `estimated` | 16 | Falchi 2016 World Atlas derived | Reference only (not independent) |
 
 **Columns:** WKT, name, region, expected_sqm, sqm_source, sqm_type, description
@@ -34,7 +34,7 @@ Ground-truth datasets used to validate the PSF skyglow model and pipeline output
 
 **Sources:** Dark Sky Alqueva, Visit Portugal, Portuguese astronomy clubs, travel guides.
 
-**Validation use:** Proximity detection — what % of expert-recommended spots have a pipeline output spot within 5km / 10km.
+**Validation use:** None. `validate.py` replaced these town-centre locations with `official_observation_points.csv` (exact positions).
 
 ## darkskysites/
 
@@ -43,18 +43,19 @@ VIIRS-based reference sky brightness model from darkskysites.com (LUMIX engine).
 - `portugal_grid_sqm_2012_2025.json` — 1,920 points at 0.1° spacing, annual SQM 2012-2025
 - `README.md` — API details and download methodology
 
-**Validation use:** Cross-model comparison (our simplified PSF vs. full Garstang RT). Not independent ground-truth but tests consistency with established models.
+**Validation use:** Model inter-comparison only. Both models are driven by VIIRS, so this is not validation (`validate.py`: "never as validation").
 
 ## tess-ida/
 
 TESS (Telescope Encoder and Sky Sensor) photometer data from the Stars4All European network.
 
-- `IDA/` — Monthly .dat files for 20 Portuguese stations (2019-2025)
-- `adm/tessida.db` — SQLite database of all readings
-- `tess_station_summary.json` — Per-station statistics (readings, median/max/P95 SQM)
+- `IDA/` — Monthly .dat files for 20 stations (2019-2025; not committed)
+- `adm/tessida.db` — SQLite database of all readings (not committed)
+- `tess_clear_sky.json` — Clear-sky moonless zenith SQM per site, from `scripts/derive_tess_clear_sky.py`
+- `tess_station_summary.json` — Superseded per-station summary (not used)
 - `.env` — Stars4All NextCloud URL for data download
 
-**Validation use:** Continuous instrumental ground-truth (6.4M nighttime readings). Best-night max SQM compared against PSF predictions.
+**Validation use:** Primary source. Per site, the mode of dark (Sun < −18°), moonless readings, compared with the model pixel; 16 pixels fall inside the raster.
 
 See `tess-ida/README.md` for station details and download instructions.
 
