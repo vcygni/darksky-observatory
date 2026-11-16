@@ -10,8 +10,6 @@ Sources and how each is used (see docs/methodology.md §15):
 * Published SQM sites: only rows that validation/portugal/published_sites_audit.csv
   marks "indicative" (peer-reviewed source exists, per-site value/location not
   verifiable) are reported, separately; none qualify as primary.
-* darkskysites.com grid: a VIIRS-based model, not an observation. Reported as a
-  model inter-comparison, never as validation.
 * Official observation points: distance from each point to the nearest pipeline
   spot (descriptive; replaces town-centre "expert spots").
 
@@ -80,13 +78,6 @@ def _load_tess_sites() -> list[dict] | None:
         return None
     data = json.loads(path.read_text())
     return [s for s in data["sites"] if "clear_sky_sqm_mode" in s]
-
-
-def _load_darkskysites_grid():
-    grid_path = VALIDATION_DIR / "darkskysites" / "portugal_grid_sqm_2012_2025.json"
-    if not grid_path.exists():
-        return None
-    return json.loads(grid_path.read_text())["data"]
 
 
 def _load_official_points() -> gpd.GeoDataFrame | None:
@@ -166,7 +157,7 @@ def run_validation(
     spots: gpd.GeoDataFrame | None = None,
 ) -> dict:
     """Validate the predicted SQM map; see module docstring for source handling."""
-    report = {"primary": {}, "indicative": {}, "model_intercomparison": {}, "descriptive": {}}
+    report = {"primary": {}, "indicative": {}, "descriptive": {}}
 
     # 1. TESS (primary)
     tess = _load_tess_sites()
@@ -235,24 +226,7 @@ def run_validation(
                 "description": "Not a baseline: per-site value/location not verifiable (published_sites_audit.csv)",
             }
 
-    # 3. darkskysites.com (model inter-comparison)
-    grid = _load_darkskysites_grid()
-    if grid:
-        preds, refs = [], []
-        for pt in grid:
-            annual = {r["year"]: r["sqm"] for r in pt["annual"]}
-            ref = annual.get(2024, annual.get(2023))
-            p = _sample_sqm_map(sqm_map, x_coords, y_coords, pt["lat"], pt["lon"])
-            if ref is not None and not np.isnan(p):
-                preds.append(p)
-                refs.append(ref)
-        if len(preds) > 2:
-            report["model_intercomparison"]["darkskysites_grid"] = {
-                **_metrics(preds, refs),
-                "description": "darkskysites.com VIIRS-based model (not independent of VIIRS; not validation)",
-            }
-
-    # 4. Official observation points vs pipeline spots (descriptive)
+    # 3. Official observation points vs pipeline spots (descriptive)
     official = _load_official_points()
     if official is not None and spots is not None and len(spots) > 0:
         from scipy.spatial import cKDTree

@@ -9,7 +9,6 @@ Notebook `notebooks/portugal/03_validation.ipynb` displays the same files.
 |------|--------|---|----------|
 | Primary | TESS photometers, clear-sky moonless zenith | 16 pixels | accuracy |
 | Indicative | Published SQM sites passing the audit | 2 | reported separately, not a baseline |
-| Model inter-comparison | darkskysites.com grid | 1,729 | consistency with another VIIRS model, **not validation** |
 | Descriptive | Official observation points | 18 | distance to nearest spot |
 
 No MAE is pooled across sources.
@@ -74,13 +73,6 @@ MAE 0.191, bias +0.191 mag. The other 5 measured sites are excluded:
 `validation/portugal/published_sites_audit.csv` gives the reason for each
 (unverifiable value or certification, wrong or unknown coordinates).
 
-## Model inter-comparison: darkskysites.com (not validation)
-
-n = 1,729, MAE 0.244, bias +0.177, RMSE 0.285 mag, Pearson r 0.970, Spearman ρ 0.959.
-Both models are driven by VIIRS radiance, so this shows agreement with another model,
-not accuracy against the sky. n is below the 1,920 grid points because points outside
-the model raster are no longer sampled (they were clamped to the edge pixel).
-
 ## Descriptive: official observation points
 
 Distance from each of 18 official/public observation points to the nearest pipeline
@@ -91,7 +83,6 @@ spot: median 4.2 km, max 31.9 km.
 | Earlier claim | Status |
 |---------------|--------|
 | "4 independent sources (1,935 points)", cross-source MAE 0.342 | pooled a VIIRS-based model (1,920 points) with 15 observations; not reproducible |
-| Pearson r = 0.937 / 0.949 "validation" | darkskysites.com model inter-comparison, not validation (now r = 0.970) |
 | Published SQM MAE 0.286 (7 sites) | from a model version not in the repository; 5 of 7 sites fail the audit |
 | TESS MAE 0.268 (8 stations, best-night max) | best-night maximum is not the clear-sky value the model predicts; replaced by the KDE mode |
 | SSI weight robustness (Spearman ρ > 0.97) and 14 flagged spots | no code in the repository produces them; removed |

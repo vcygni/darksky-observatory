@@ -232,7 +232,6 @@ Run with `make validate` (`scripts/run_validation.py`) and `scripts/fit_calibrat
 | Primary | TESS clear-sky (KDE mode), current CALIB_FACTOR | 16 pixels | 0.683 | +0.552 | 0.736 |
 | Primary | TESS clear-sky, leave-one-out refit | 16 pixels | 0.593 | +0.130 | 0.712 |
 | Indicative | Published SQM passing the audit | 2 | 0.191 | +0.191 | -- |
-| Model inter-comparison (not validation) | darkskysites.com grid | 1,729 | 0.244 | +0.177 | 0.970 |
 | Descriptive | Official observation points to nearest spot | 18 | median 4.2 km, max 31.9 km | | |
 
 **TESS sample.** 20 stations → 21 sites → 16 pixels in the raster; 15 in Spain (Extremadura town sites), 1 in Portugal (Porto). Only 4 pixels are as dark as the ranked spots (observed ≥ 20.5).

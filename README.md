@@ -39,7 +39,6 @@ make run             # ~36s with local data
 | TESS clear-sky, current calibration | MAE 0.683 mag, bias +0.552, r 0.736 (16 pixels) |
 | TESS clear-sky, leave-one-out | MAE 0.593 mag (16 pixels) |
 | Published SQM (audited, indicative) | MAE 0.191 mag (2 sites) |
-| darkskysites.com (model inter-comparison, not validation) | r 0.970, MAE 0.244 mag (1,729 points) |
 | Official observation points → nearest spot | median 4.2 km, max 31.9 km (18 points) |
 
 Full validation details: [docs/validation_report.md](docs/validation_report.md)

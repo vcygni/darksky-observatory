@@ -13,7 +13,6 @@
 | Points of Interest | OSM Foundation | Overpass API | Vector | Public |
 | Admin Boundaries | UC Davis | GADM v4.1 | Vector | gadm.org |
 | Validation (TESS) | Stars4All | TESS-IDA network | Point | api.stars4all.eu |
-| Validation (grid) | darkskysites.com | LUMIX model | 0.1 deg | Web |
 | Validation (SQM) | Literature | Field measurements | Point | Papers |
 
 ## OSM Tags Queried
