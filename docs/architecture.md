@@ -1,110 +1,80 @@
-# System Architecture
+# Architecture
 
-## Repository Structure
+## Repository
 
 ```
 darksky-observatory/
-├── apps/stargazing_spots/       # Python pipeline (23 modules)
+├── apps/stargazing_spots/
+│   ├── stargazing_spots/        # Pipeline package (22 modules)
+│   └── tests/
+├── scripts/                     # Downloads, boundary, TESS reduction, calibration, validation
+├── notebooks/portugal/          # Analysis notebooks (3)
+├── validation/portugal/         # Ground-truth data
+├── docs/
 ├── Makefile
 ├── docker-compose.yml
-├── pyproject.toml               # uv workspace monorepo
-└── docs/
+└── pyproject.toml               # uv workspace root; ruff, mypy and pytest config
 ```
 
-## Data Flow
+## Data flow
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│  STAGE 1: ACQUISITION                                                    │
-│  acquisition.py                                                          │
-│  NASA LP DAAC → blackmarblepy → joblib cache → xarray Dataset            │
-└───────────────────────────────────────┬─────────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────────┐
-│  STAGE 2-3: PROCESSING + CLASSIFICATION                                  │
-│  processing.py                                                           │
-│  Temporal composite (median + stability + trend) → dark-sky mask         │
-└───────────────────────────────────────┬─────────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────────┐
-│  STAGE 4: ENRICHMENT                                                     │
-│  enrichment.py + enrichment_raster.py                                    │
-│  OSM extract (osm_extract.py) → raster-native pixel sampling             │
-└───────────────────────────────────────┬─────────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────────┐
-│  STAGE 5-6: SKYGLOW + CLOUD COVER                                        │
-│  skyglow.py + cloud_cover.py                                             │
-│  PSF convolution (FFT) → SQM prediction                                  │
-│  ERA5 hourly cloud cover → clear-night fraction                          │
-└───────────────────────────────────────┬─────────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────────┐
-│  STAGE 7-9: ASSESSMENT (parallel)                                        │
-│  assess.py → sky_view.py + land_cover.py + accessibility.py              │
-│  SVF (DEM + Hansen) | WorldCover + Hansen | DEM slope                    │
-└───────────────────────────────────────┬─────────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────────┐
-│  STAGE 10-11: SUITABILITY                                                │
-│  suitability.py                                                          │
-│  SSI (6-factor WLC) → per-region two-class split → dedup → density cap   │
-└───────────────────────────────────────┬─────────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────────┐
-│  STAGE 12-14: TIERING + ACCESS + CHANGE DETECTION                        │
-│  access_check.py + access_points.py + change_detection.py                │
-└───────────────────────────────────────┬─────────────────────────────────┘
-                                        │
-┌───────────────────────────────────────▼─────────────────────────────────┐
-│  STAGE 15-16: EXPORT + VALIDATION                                        │
-│  export.py + stac_catalog.py + validate.py                               │
-│  GeoJSON | Parquet | COG | STAC Catalog                                  │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+`make run` (`pipeline.run_all`):
 
-## Module Responsibilities
+1. `osm_extract`: candidate OSM nodes inside the land boundary (one pass over the extract).
+2. Per region (`pipeline.run_region`, regions in `config.REGIONS`):
+   1. `processing`: three annual composites → median, spread, change, dark-sky mask.
+   2. `uncertainty`, `change_detection`: confidence layer and change statistics; COGs written.
+   3. `enrichment_raster`, `enrichment`: candidates on dark pixels, tag score.
+   4. `assess`: `skyglow` (PSF → SQM), `cloud_cover` (ERA5 clear-night fraction), `terrain` (SVF, elevation, slope), `land_cover`, `access_check`, then `suitability` (SSI).
+   5. `assess.select_spots`: physical filters, per-region two-class SSI split, deduplication, density cap.
+   6. `export`, `stac_catalog`: GeoJSON, GeoParquet, STAC.
+3. Merge regions → `spots_all.geojson`; `access_points` adds the drivable access point per spot.
+
+`scripts/run_validation.py` (`validate`) and `scripts/fit_calibration.py` run on the outputs.
+
+## Modules
 
 | Module | Role |
 |--------|------|
-| `acquisition` | VIIRS download via blackmarblepy, joblib caching |
-| `processing` | Temporal composite, classification, coordinate extraction |
-| `enrichment` | OSM tag selection and filtering |
+| `config` | Paths, regions, years, VIIRS cache names |
+| `pipeline` | Per-region run and merged output |
+| `processing` | Temporal composite and dark-sky classification |
+| `uncertainty` | Per-pixel confidence |
+| `change_detection` | Inter-annual radiance change |
 | `osm_extract` | Candidate nodes from the local OSM extract |
-| `access_points` | Nearest drivable, legal-to-stop road point per spot |
-| `enrichment_raster` | Raster-native pixel sampling of OSM features |
-| `skyglow` | PSF convolution (FFT), SQM prediction, Bortle classification |
+| `enrichment` | OSM tag selection and tag score |
+| `enrichment_raster` | Candidates on dark pixels with pixel statistics |
+| `skyglow` | PSF convolution (FFT), SQM, Bortle class |
 | `cloud_cover` | ERA5 hourly clear-night fraction |
-| `sky_view` | Vegetation-aware SVF (DEM + Hansen) |
-| `land_cover` | WorldCover + Hansen probabilistic scoring |
-| `accessibility` | DEM slope |
+| `terrain` | Sky view factor, elevation, slope (Copernicus GLO-30) |
+| `land_cover` | WorldCover class, Hansen canopy fraction |
+| `tiles` | DEM, WorldCover and Hansen tile names and sources |
+| `geo` | Nearest-pixel lookup on regular grids |
+| `access_check` | Night-access hints from OSM tags |
 | `suitability` | SSI weighted linear combination |
-| `assess` | Assessment orchestrator, filters, per-region SSI split, thinning |
-| `access_check` | Nighttime access classification, island detection |
-| `change_detection` | Multi-temporal trend analysis |
-| `uncertainty` | Per-pixel confidence scoring |
-| `sensitivity` | Radiance-threshold sensitivity analysis (not run by default) |
-| `quality` | Data quality assessment |
-| `validate` | Automated validation against ground-truth |
-| `export` | GeoJSON, Parquet, COG output |
-| `stac_catalog` | STAC catalog generation |
-| `reprojection` | CRS utilities |
+| `assess` | Assessment, filters, two-class split, thinning |
+| `access_points` | Nearest drivable, legal-to-stop road point |
+| `sensitivity` | Threshold sensitivity (`--sensitivity`) |
+| `validate` | Comparison with TESS and published SQM |
+| `export` | GeoJSON, GeoParquet, COG |
+| `stac_catalog` | STAC catalog per region |
 
-## Data Formats
+## Formats
 
-| Stage | Format |
-|-------|--------|
-| Input | HDF-EOS5 (.h5), sinusoidal projection |
-| Cached | joblib pickle (xarray Dataset) |
-| Classification | xarray DataArray, exported as COG |
-| Vector | GeoDataFrame → GeoJSON + GeoParquet |
-| Metadata | STAC JSON |
+| Data | Format |
+|------|--------|
+| VIIRS input | joblib (xarray Dataset on a 15″ lat/lon grid, from blackmarblepy) |
+| Rasters | Cloud Optimized GeoTIFF |
+| Spots | GeoJSON, GeoParquet |
+| Metadata | STAC JSON, `run_metadata.json` |
 
-## Infrastructure
+## Tooling
 
-| Component | Technology |
-|-----------|-----------|
-| Package management | uv workspace (pyproject.toml) |
-| Build orchestration | Makefile |
-| Containerization | docker-compose.yml |
-| Environment config | apps/stargazing_spots/.env |
+| Component | Tool |
+|-----------|------|
+| Environment | uv workspace, Python ≥ 3.12 |
+| Lint, format | ruff (all rules, documented ignores) |
+| Types | mypy `--strict` |
+| Tests | pytest (strict config, warnings as errors) |
+| CI | GitHub Actions, Python 3.12 and 3.13 |
+| Container | Docker (`base` and `test` targets), docker compose |

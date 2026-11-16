@@ -4,7 +4,7 @@
 
 | Dataset | Provider | Product | Resolution | Access |
 |---------|----------|---------|-----------|--------|
-| Nighttime Lights | NASA LP DAAC | VNP46A4v001 | 500m annual | Earthdata Login (free) |
+| Nighttime Lights | NASA LAADS DAAC | VNP46A4 (Black Marble collection 2) | 15 arc-seconds, annual | Earthdata Login (free) |
 | Cloud | ECMWF / C3S | ERA5 hourly TCC | 0.25 deg | DestinE Earth Data Hub (free account) |
 | Elevation | ESA / Copernicus | GLO-30 DEM | 30m | AWS S3 (public) |
 | Forest Canopy | U. Maryland | Hansen GFC v1.11 | 30m | GCS (public) |
@@ -44,4 +44,4 @@ landuse = meadow | grass
 | VIIRS VNP46A4 | https://urs.earthdata.nasa.gov/ |
 | ERA5 | https://earthdatahub.destine.eu/ |
 
-All other datasets are publicly accessible without authentication. The pipeline fetches them automatically on first run.
+All other datasets are public. `make download-data` stores the DEM, WorldCover and Hansen tiles locally; without them the pipeline reads the same tiles over HTTPS.

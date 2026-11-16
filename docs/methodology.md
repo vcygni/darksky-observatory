@@ -13,14 +13,14 @@ Parameters marked *design choice* are set by hand and not fitted to observations
 
 | Parameter | Value |
 |-----------|-------|
-| Product | VNP46A4v001 (Black Marble annual) |
+| Product | VNP46A4, Black Marble collection 2 (annual; `make download-viirs`) |
 | Variable | `NearNadir_Composite_Snow_Free` |
 | Grid | 15 arc-seconds (~460 m N-S, ~360 m E-W at 39° N) |
 | Units | nW/cm^2/sr |
 | Years | 2023, 2024, 2025 |
 | Tiles | h14v05, h15v05, h16v05, h17v04, h17v05 |
 
-Quality flags 1 (poor) and 255 (fill) are removed at ingestion.
+Quality flags 1 (poor) and 255 (fill) are removed at download (`scripts/download_viirs.py`, blackmarblepy).
 
 ### OpenStreetMap
 

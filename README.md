@@ -3,7 +3,7 @@
 Satellite-derived dark-sky mapping pipeline: ingests VIIRS VNP46A4 nighttime radiance, applies PSF skyglow propagation and multi-criteria scoring, outputs ranked stargazing locations for Portugal.
 
 [![CI](https://github.com/vcygni/darksky-observatory/actions/workflows/ci.yml/badge.svg)](https://github.com/vcygni/darksky-observatory/actions/workflows/ci.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
 3-year VIIRS median (2023-2025) on a 15 arc-second grid, scored by a 6-factor SSI combining PSF-predicted SQM, ERA5 hourly clear-night fraction, vegetation-aware sky view factor, land cover, slope and elevation. The PSF scale is fitted to 16 TESS photometer pixels; leave-one-out MAE 0.593 mag (see [validation](docs/validation_report.md)). Each spot gets a drivable access point (OSRM car rules + Portuguese traffic code) from a local OpenStreetMap extract.
@@ -16,12 +16,13 @@ Satellite-derived dark-sky mapping pipeline: ingests VIIRS VNP46A4 nighttime rad
 git clone https://github.com/vcygni/darksky-observatory.git
 cd darksky-observatory
 make install
-make test            # 117 tests, no data needed
+make test            # 112 tests, no data needed
 cp apps/stargazing_spots/.env.example apps/stargazing_spots/.env
 # Add EARTHDATA_TOKEN + EDH_TOKEN
-make download-data   # ~2 GB terrain tiles
 make download-osm    # ~425 MB OpenStreetMap extract
 make boundary        # Portugal land boundary from the extract
+make download-viirs  # VIIRS annual composites, 3 regions x 3 years
+make download-data   # ~2 GB terrain tiles over the boundary
 make run             # ~2 min with local data and cached cloud climatology
 make validate
 ```
@@ -46,8 +47,8 @@ Spots are the upper class of a two-class SSI split within each region ([methodol
 
 ```
 darksky-observatory/
-├── apps/stargazing_spots/          # Pipeline (23 modules) and tests
-├── scripts/                        # Boundary, TESS, calibration, validation, thresholds
+├── apps/stargazing_spots/          # Pipeline (22 modules) and tests
+├── scripts/                        # Downloads, boundary, TESS, calibration, validation
 ├── notebooks/portugal/             # Analysis notebooks (3)
 ├── validation/portugal/            # Ground-truth data
 ├── docs/                           # Methodology, architecture, data sources, validation
@@ -59,7 +60,7 @@ darksky-observatory/
 
 | Dataset | Provider | Resolution |
 |---------|----------|-----------|
-| Nighttime lights | NASA LP DAAC (VNP46A4) | 15 arc-seconds, annual |
+| Nighttime lights | NASA LAADS DAAC (VNP46A4) | 15 arc-seconds, annual |
 | Cloud cover | ECMWF ERA5 hourly (Earth Data Hub) | 0.25° |
 | Elevation | Copernicus GLO-30 | 30 m |
 | Forest canopy | Hansen GFC | 30 m |
