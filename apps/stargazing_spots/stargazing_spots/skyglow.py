@@ -10,7 +10,6 @@ from dataclasses import dataclass
 
 import geopandas as gpd
 import numpy as np
-import pandas as pd
 from scipy.signal import fftconvolve
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,6 @@ class PropagationConfig:
     pixel_size_km: float = 0.42  # VIIRS VNP46A4 at ~39°N
     softening_km: float = 1.0  # Near-field softening (Duriscoe 2018)
     extinction_rate: float = EXTINCTION_RATE  # Atmospheric extinction (per km)
-    elevation_correction: bool = True
 
 
 def build_psf_kernel(
@@ -204,25 +202,6 @@ def classify_stargazing_quality(sqm: float) -> str:
         return "urban"
 
 
-def apply_elevation_correction(sqm: np.ndarray, elevation_m: np.ndarray) -> np.ndarray:
-    """Apply elevation correction to SQM predictions.
-
-    Higher altitude = less atmosphere above = less scattering.
-    Empirical correction from Falchi et al. (2016):
-        ~0.1-0.2 mag improvement per 1000m elevation.
-
-    Args:
-        sqm: Predicted SQM values at sea level.
-        elevation_m: Elevation in meters.
-
-    Returns:
-        Corrected SQM values (higher = darker = better).
-    """
-    # Conservative estimate: 0.13 mag/1000m (between Falchi's 0.1-0.2 range)
-    correction = 0.13 * elevation_m / 1000.0
-    return sqm + correction
-
-
 def assess_spots(
     spots: gpd.GeoDataFrame,
     radiance: np.ndarray,
@@ -236,7 +215,7 @@ def assess_spots(
     each spot location to predict the SQM reading and Bortle class.
 
     Args:
-        spots: GeoDataFrame with Point geometry and optional 'ele' column.
+        spots: GeoDataFrame with Point geometry.
         radiance: Full 2D radiance grid (median, ALL pixels including bright).
         x_coords: 1D array of x (longitude) coordinates.
         y_coords: 1D array of y (latitude) coordinates.
@@ -280,15 +259,7 @@ def assess_spots(
         ]
     )
 
-    # Step 4: Elevation correction
-    if config.elevation_correction and "ele" in spots.columns:
-        elevation = pd.to_numeric(spots["ele"], errors="coerce").fillna(0).values
-        sqm_values = apply_elevation_correction(sqm_values, elevation)
-        logger.info(
-            "Applied elevation correction (mean ele: %.0fm)", np.mean(elevation[elevation > 0])
-        )
-
-    # Step 5: Classify
+    # Step 4: Classify
     bortle_values = np.array([int(sqm_to_bortle(np.array([s]))[0]) for s in sqm_values])
     quality_values = [classify_stargazing_quality(s) for s in sqm_values]
 
