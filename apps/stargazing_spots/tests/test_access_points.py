@@ -1,4 +1,6 @@
-"""Tests for drivable access-point selection (offline, no OSM extract needed)."""
+"""Drivable access-point selection (offline, no OSM extract needed)."""
+
+import math
 
 import pytest
 
@@ -7,11 +9,21 @@ from stargazing_spots.access_points import (
     Road,
     choose_access_point,
     grid_cells,
-    haversine_m,
     is_drivable,
     nearest_point_on_road,
     padded_box,
 )
+
+
+def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance in metres (reference for the planar approximation)."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    a = (
+        math.sin((p2 - p1) / 2) ** 2
+        + math.cos(p1) * math.cos(p2) * math.sin(math.radians(lon2 - lon1) / 2) ** 2
+    )
+    return 2 * 6_371_008.8 * math.asin(math.sqrt(a))
+
 
 SPOT = (40.8666629, -8.2918792)  # Mizarela peak, Serra da Freita
 
@@ -38,7 +50,7 @@ class TestGeometry:
 
 class TestTagClassification:
     @pytest.mark.parametrize(
-        "tags,expected",
+        ("tags", "expected"),
         [
             # OSRM car.lua speed table
             ({"highway": "tertiary"}, True),
@@ -96,7 +108,8 @@ class TestChooseAccessPoint:
     def test_road_beyond_threshold_gives_none(self):
         ap = choose_access_point(*SPOT, [ROAD_FAR_1KM])
         assert ap.kind == "none"
-        assert ap.lat is None and ap.walk_m is None
+        assert ap.lat is None
+        assert ap.walk_m is None
 
     def test_threshold_is_inclusive(self):
         d, _, _ = nearest_point_on_road(*SPOT, ROAD_EAST_100M)

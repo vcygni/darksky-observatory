@@ -1,74 +1,53 @@
-"""Tests for OSM enrichment and scoring."""
+"""Tag score and sampling of candidate features on dark pixels."""
 
 import geopandas as gpd
-import pytest
+import numpy as np
+import xarray as xr
 from shapely.geometry import Point
 
-from stargazing_spots.enrichment import score_spots, spatial_join
+from stargazing_spots.enrichment import score_spots
+from stargazing_spots.enrichment_raster import features_on_dark_pixels
+from stargazing_spots.processing import classify_temporal
 
 
-@pytest.fixture
-def sample_features():
-    """Create mock OSM features."""
-    return gpd.GeoDataFrame(
+def test_score_spots_values_and_order():
+    features = gpd.GeoDataFrame(
         {
-            "name": ["Viewpoint A", "Park B", "Camp C", "City Center"],
-            "tourism": ["viewpoint", None, "camp_site", None],
-            "leisure": [None, "park", None, None],
-            "ele": ["800", None, "300", "50"],
-            "access": ["yes", "permissive", None, "private"],
+            "name": ["view", "park", "plain"],
+            "tourism": ["viewpoint", None, None],
+            "leisure": [None, "park", None],
+            "ele": ["800", None, "abc"],
+            "access": ["yes", None, "private"],
         },
+        geometry=[Point(0, 0)] * 3,
+    )
+    scored = score_spots(features)
+    assert scored["name"].tolist() == ["view", "park", "plain"]
+    assert scored["stargazing_score"].tolist() == [8 + 5 + 2, 3, 0]
+
+
+def _composite(values: list[list[float]]):
+    grid = xr.DataArray(
+        np.array(values), dims=("y", "x"), coords={"y": [41.0, 40.0], "x": [-8.0, -7.0]}
+    )
+    return classify_temporal([grid, grid, grid], threshold=3.0)
+
+
+def test_features_on_dark_pixels_keeps_dark_points_inside_the_grid():
+    composite = _composite([[1.0, 5.0], [2.0, np.nan]])
+    features = gpd.GeoDataFrame(
+        {"name": ["dark", "bright", "nodata", "outside", "dark-duplicate"]},
         geometry=[
-            Point(-8.0, 40.0),
-            Point(-8.1, 40.1),
-            Point(-8.2, 40.2),
-            Point(-8.5, 40.5),
+            Point(-8.1, 41.1),
+            Point(-7.0, 41.0),
+            Point(-7.0, 40.0),
+            Point(-5.0, 41.0),  # beyond half a pixel east of the grid
+            Point(-7.9, 40.9),  # same pixel and name as "dark" after renaming below
         ],
         crs="EPSG:4326",
     )
-
-
-@pytest.fixture
-def sample_dark_coords():
-    """Create mock dark-sky pixel centroids near the first 3 features."""
-    return gpd.GeoDataFrame(
-        {"radiance": [1.0, 1.5, 2.0]},
-        geometry=[
-            Point(-8.001, 40.001),
-            Point(-8.101, 40.101),
-            Point(-8.201, 40.201),
-        ],
-        crs="EPSG:4326",
-    )
-
-
-def test_score_spots_ordering(sample_features):
-    scored = score_spots(sample_features)
-    assert "stargazing_score" in scored.columns
-    # Viewpoint A should score highest (viewpoint + elevation + access)
-    assert scored.iloc[0]["name"] == "Viewpoint A"
-
-
-def test_score_spots_values(sample_features):
-    scored = score_spots(sample_features)
-    scores = scored["stargazing_score"].values
-    # All scores should be non-negative
-    assert all(s >= 0 for s in scores)
-
-
-def test_spatial_join_finds_nearby(sample_features, sample_dark_coords):
-    result = spatial_join(sample_features, sample_dark_coords, buffer_m=5000)
-    # First 3 features are near dark coords; City Center is far away
-    names = result["name"].tolist()
-    assert "Viewpoint A" in names
-    assert "City Center" not in names
-
-
-def test_spatial_join_empty_result(sample_features):
-    far_coords = gpd.GeoDataFrame(
-        {"radiance": [1.0]},
-        geometry=[Point(10.0, 60.0)],  # Far from Portugal
-        crs="EPSG:4326",
-    )
-    result = spatial_join(sample_features, far_coords, buffer_m=500)
-    assert len(result) == 0
+    features.loc[4, "name"] = "dark"
+    result = features_on_dark_pixels(composite, features, threshold=3.0)
+    assert result["name"].tolist() == ["dark"]
+    assert result["pixel_radiance"].tolist() == [1.0]
+    assert result["trend_direction"].tolist() == ["stable"]

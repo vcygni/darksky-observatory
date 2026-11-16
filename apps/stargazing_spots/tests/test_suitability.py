@@ -24,7 +24,7 @@ class TestSSIWeights:
         assert abs(total - 1.0) < 0.01
 
     def test_invalid_weights_raise(self):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="must sum to 1"):
             SSIWeights(
                 darkness=0.5,
                 clear_sky=0.5,

@@ -1,43 +1,38 @@
-"""Validation of the PSF sky-brightness model against independent ground truth.
+"""Validation of the predicted SQM map (docs/methodology.md, Validation Summary).
 
-Sources and how each is used (see docs/methodology.md §14):
+* TESS photometers (primary): clear-sky moonless zenith SQM per site from
+  scripts/derive_tess_clear_sky.py; sites in one model pixel are averaged.
+* Published SQM sites (indicative): rows marked "indicative" in
+  validation/portugal/published_sites_audit.csv, reported separately.
+* Official observation points (descriptive): distance to the nearest spot.
 
-* TESS photometers (primary): clear-sky moonless zenith brightness per site,
-  derived from the raw readings by scripts/derive_tess_clear_sky.py (header
-  positions, calibrated files only, Sun < -18°, Moon < 0°, KDE mode). Sites
-  falling in the same model pixel are averaged so one location is not counted
-  twice (e.g. two photometers on one Porto building).
-* Published SQM sites: only rows that validation/portugal/published_sites_audit.csv
-  marks "indicative" (peer-reviewed source exists, per-site value/location not
-  verifiable) are reported, separately; none qualify as primary.
-* Official observation points: distance from each point to the nearest pipeline
-  spot (descriptive; replaces town-centre "expert spots").
-
-Points outside the model raster are never sampled (previously they were clamped
-to the edge pixel). No MAE is pooled across heterogeneous sources.
+Points outside the raster are not sampled. No error is pooled across sources.
 """
 
 import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import geopandas as gpd
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
+from scipy.spatial import cKDTree
 from scipy.stats import pearsonr, spearmanr
 from shapely import wkt
 
+from stargazing_spots.geo import FloatArray, inside, nearest_index
+
 logger = logging.getLogger(__name__)
 
+UTM_29N = 32629
+MIN_CORRELATION_POINTS = 3
 
-def _find_validation_dir() -> Path:
-    """Locate validation/portugal: $VALIDATION_DIR, else the nearest parent that has it.
 
-    The repo layout puts it three levels above this file; in the Docker image it
-    is mounted at /app/validation, one level up. A fixed ``parents[3]`` raised
-    IndexError inside the container.
-    """
+def find_validation_dir() -> Path:
+    """$VALIDATION_DIR, else the nearest parent directory containing validation/portugal."""
     env = os.getenv("VALIDATION_DIR")
     if env:
         return Path(env)
@@ -46,16 +41,13 @@ def _find_validation_dir() -> Path:
         candidate = parent / "validation" / "portugal"
         if candidate.is_dir():
             return candidate
-    return here.parent / "validation" / "portugal"  # not found; loaders report missing files
+    return here.parent / "validation" / "portugal"  # absent: loaders return None
 
 
-VALIDATION_DIR = _find_validation_dir()
+VALIDATION_DIR = find_validation_dir()
 
 
-# --- Loading ------------------------------------------------------------------
-
-
-def _load_published_sites() -> gpd.GeoDataFrame | None:
+def load_published_sites() -> gpd.GeoDataFrame | None:
     """Measured published sites joined with their audit decision."""
     csv_path = VALIDATION_DIR / "stargazing_sites.csv"
     audit_path = VALIDATION_DIR / "published_sites_audit.csv"
@@ -72,7 +64,7 @@ def _load_published_sites() -> gpd.GeoDataFrame | None:
     return gpd.GeoDataFrame(measured, geometry="geometry", crs="EPSG:4326")
 
 
-def _load_tess_sites() -> list[dict] | None:
+def load_tess_sites() -> list[dict[str, Any]] | None:
     path = VALIDATION_DIR / "tess-ida" / "tess_clear_sky.json"
     if not path.exists():
         return None
@@ -80,7 +72,7 @@ def _load_tess_sites() -> list[dict] | None:
     return [s for s in data["sites"] if "clear_sky_sqm_mode" in s]
 
 
-def _load_official_points() -> gpd.GeoDataFrame | None:
+def load_official_points() -> gpd.GeoDataFrame | None:
     path = VALIDATION_DIR / "official_observation_points.csv"
     if not path.exists():
         return None
@@ -90,56 +82,53 @@ def _load_official_points() -> gpd.GeoDataFrame | None:
     )
 
 
-# --- Sampling and statistics ----------------------------------------------------
-
-
-def _pixel_index(x_coords, y_coords, lat, lon) -> tuple[int, int] | None:
+def pixel_index(
+    x_coords: FloatArray, y_coords: FloatArray, lat: float, lon: float
+) -> tuple[int, int] | None:
     """Row/col of the model pixel containing (lat, lon), or None if outside the raster."""
-    dx = abs(float(x_coords[1] - x_coords[0]))
-    dy = abs(float(y_coords[1] - y_coords[0]))
-    if not (x_coords.min() - dx / 2 <= lon <= x_coords.max() + dx / 2):
+    if not (inside(x_coords, [lon])[0] and inside(y_coords, [lat])[0]):
         return None
-    if not (y_coords.min() - dy / 2 <= lat <= y_coords.max() + dy / 2):
-        return None
-    return int(np.argmin(np.abs(y_coords - lat))), int(np.argmin(np.abs(x_coords - lon)))
+    return int(nearest_index(y_coords, [lat])[0]), int(nearest_index(x_coords, [lon])[0])
 
 
-def _sample_sqm_map(sqm_map, x_coords, y_coords, lat, lon) -> float:
+def sample_sqm_map(
+    sqm_map: FloatArray, x_coords: FloatArray, y_coords: FloatArray, lat: float, lon: float
+) -> float:
     """Predicted SQM at a coordinate; NaN outside the raster or on nodata."""
-    idx = _pixel_index(x_coords, y_coords, lat, lon)
+    idx = pixel_index(x_coords, y_coords, lat, lon)
     if idx is None:
         return np.nan
     return float(sqm_map[idx])
 
 
-def _metrics(pred, obs) -> dict:
+def metrics(pred: npt.ArrayLike, obs: npt.ArrayLike) -> dict[str, float | int]:
     pred, obs = np.asarray(pred, float), np.asarray(obs, float)
     err = pred - obs
     out = {
-        "n": int(len(err)),
+        "n": len(err),
         "mae": round(float(np.mean(np.abs(err))), 3),
         "bias": round(float(np.mean(err)), 3),
         "rmse": round(float(np.sqrt(np.mean(err**2))), 3),
         "max_abs_error": round(float(np.max(np.abs(err))), 3),
     }
-    if len(err) > 2:
-        out["pearson_r"] = round(float(pearsonr(pred, obs)[0]), 3)
-        out["spearman_rho"] = round(float(spearmanr(pred, obs)[0]), 3)
+    if len(err) >= MIN_CORRELATION_POINTS:
+        out["pearson_r"] = round(float(pearsonr(pred, obs).statistic), 3)
+        out["spearman_rho"] = round(float(spearmanr(pred, obs).statistic), 3)
     return out
 
 
 def group_tess_by_pixel(
-    tess: list[dict], sqm_map: np.ndarray, x_coords: np.ndarray, y_coords: np.ndarray
-) -> tuple[dict[tuple[int, int], list[dict]], list[str]]:
+    tess: list[dict[str, Any]], sqm_map: np.ndarray, x_coords: np.ndarray, y_coords: np.ndarray
+) -> tuple[dict[tuple[int, int], list[dict[str, Any]]], list[str]]:
     """TESS sites keyed by model pixel, plus stations outside the raster or on nodata.
 
     Sites in one pixel are averaged downstream so a location is not counted twice.
     Shared by validation and scripts/fit_calibration.py so both use the same sample.
     """
-    by_pixel: dict[tuple[int, int], list[dict]] = {}
+    by_pixel: dict[tuple[int, int], list[dict[str, Any]]] = {}
     outside = []
     for s in tess:
-        idx = _pixel_index(x_coords, y_coords, s["lat"], s["lon"])
+        idx = pixel_index(x_coords, y_coords, s["lat"], s["lon"])
         if idx is None or np.isnan(sqm_map[idx]):
             outside.append(s["station"])
             continue
@@ -147,20 +136,17 @@ def group_tess_by_pixel(
     return by_pixel, outside
 
 
-# --- Validation ---------------------------------------------------------------------
-
-
 def run_validation(
     sqm_map: np.ndarray,
     x_coords: np.ndarray,
     y_coords: np.ndarray,
     spots: gpd.GeoDataFrame | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Validate the predicted SQM map; see module docstring for source handling."""
-    report = {"primary": {}, "indicative": {}, "descriptive": {}}
+    report: dict[str, Any] = {"primary": {}, "indicative": {}, "descriptive": {}}
 
     # 1. TESS (primary)
-    tess = _load_tess_sites()
+    tess = load_tess_sites()
     if tess:
         by_pixel, outside = group_tess_by_pixel(tess, sqm_map, x_coords, y_coords)
         rows = []
@@ -182,13 +168,15 @@ def run_validation(
             )
         if rows:
             report["primary"]["tess_clear_sky"] = {
-                **_metrics([r["predicted"] for r in rows], [r["observed_mode"] for r in rows]),
-                "sensitivity_vs_median": _metrics(
+                **metrics([r["predicted"] for r in rows], [r["observed_mode"] for r in rows]),
+                "sensitivity_vs_median": metrics(
                     [r["predicted"] for r in rows], [r["observed_median"] for r in rows]
                 ),
                 "excluded_outside_raster": outside,
                 "sites": rows,
-                "description": "TESS clear-sky moonless zenith SQM (KDE mode), one value per model pixel",
+                "description": (
+                    "TESS clear-sky moonless zenith SQM (KDE mode), one value per model pixel"
+                ),
             }
             logger.info(
                 "TESS clear-sky: MAE=%.3f bias=%+.3f r=%s (%d pixels; %d outside raster)",
@@ -200,14 +188,14 @@ def run_validation(
             )
 
     # 2. Published sites (indicative only, per audit)
-    published = _load_published_sites()
+    published = load_published_sites()
     if published is not None:
         used = published[published["use"] == "indicative"]
-        pred = [_sample_sqm_map(sqm_map, x_coords, y_coords, g.y, g.x) for g in used.geometry]
+        pred = [sample_sqm_map(sqm_map, x_coords, y_coords, g.y, g.x) for g in used.geometry]
         ok = [i for i, p in enumerate(pred) if not np.isnan(p)]
         if ok:
             report["indicative"]["published_sqm"] = {
-                **_metrics([pred[i] for i in ok], used["expected_sqm"].to_numpy()[ok]),
+                **metrics([pred[i] for i in ok], used["expected_sqm"].to_numpy()[ok]),
                 "sites": [
                     {
                         "name": used["name"].iloc[i],
@@ -223,24 +211,22 @@ def run_validation(
                         strict=True,
                     )
                 ),
-                "description": "Not a baseline: per-site value/location not verifiable (published_sites_audit.csv)",
+                "description": (
+                    "Not a baseline: per-site value/location not verifiable"
+                    " (published_sites_audit.csv)"
+                ),
             }
 
     # 3. Official observation points vs pipeline spots (descriptive)
-    official = _load_official_points()
+    official = load_official_points()
     if official is not None and spots is not None and len(spots) > 0:
-        from scipy.spatial import cKDTree
-
-        tree = cKDTree(
-            np.column_stack(
-                [spots.to_crs(epsg=32629).geometry.x, spots.to_crs(epsg=32629).geometry.y]
-            )
-        )
-        o = official.to_crs(epsg=32629)
+        utm = spots.to_crs(epsg=UTM_29N)
+        tree = cKDTree(np.column_stack([utm.geometry.x, utm.geometry.y]))
+        o = official.to_crs(epsg=UTM_29N)
         d_km, _ = tree.query(np.column_stack([o.geometry.x, o.geometry.y]))
         d_km = d_km / 1000
         report["descriptive"]["official_points_to_nearest_spot_km"] = {
-            "n": int(len(d_km)),
+            "n": len(d_km),
             "median": round(float(np.median(d_km)), 1),
             "max": round(float(d_km.max()), 1),
             "per_point": {
@@ -251,13 +237,14 @@ def run_validation(
     report["baseline"] = {
         "metric": "primary.tess_clear_sky.mae",
         "value": report["primary"].get("tess_clear_sky", {}).get("mae"),
-        "model_interpretation": "clear-sky moonless zenith brightness (PSF model + 22.0 natural background)",
+        "model_interpretation": (
+            "clear-sky moonless zenith brightness (PSF model + 22.0 natural background)"
+        ),
     }
     return report
 
 
-def save_validation_report(report: dict, output_path: Path):
-    """Save validation report as JSON."""
+def save_validation_report(report: dict[str, Any], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(json.dumps(report, indent=2, ensure_ascii=False))
     logger.info("Validation report saved: %s", output_path)

@@ -2,6 +2,7 @@
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
 from shapely.geometry import Point
 
@@ -43,8 +44,6 @@ def test_adding_a_spot_only_affects_its_own_cell(many_spots):
 
 
 def pd_concat(a, b):
-    import pandas as pd
-
     return pd.concat([a, b], ignore_index=True)
 
 

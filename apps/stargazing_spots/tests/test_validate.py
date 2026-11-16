@@ -12,20 +12,20 @@ SQM = np.arange(70, dtype=float).reshape(10, 7)
 
 
 def test_points_outside_raster_are_not_sampled():
-    assert np.isnan(v._sample_sqm_map(SQM, X, Y, 39.0, -5.0))  # east of the raster
-    assert np.isnan(v._sample_sqm_map(SQM, X, Y, 43.0, -8.0))  # north of the raster
+    assert np.isnan(v.sample_sqm_map(SQM, X, Y, 39.0, -5.0))  # east of the raster
+    assert np.isnan(v.sample_sqm_map(SQM, X, Y, 43.0, -8.0))  # north of the raster
 
 
 def test_points_inside_raster_hit_the_containing_pixel():
-    assert v._pixel_index(X, Y, 42.0, -9.5) == (0, 0)
-    assert v._pixel_index(X, Y, 41.6, -9.3) == (1, 0)
-    assert v._sample_sqm_map(SQM, X, Y, 41.6, -9.3) == SQM[1, 0]
+    assert v.pixel_index(X, Y, 42.0, -9.5) == (0, 0)
+    assert v.pixel_index(X, Y, 41.6, -9.3) == (1, 0)
+    assert v.sample_sqm_map(SQM, X, Y, 41.6, -9.3) == SQM[1, 0]
     # half a pixel beyond the last centre is still inside
-    assert v._pixel_index(X, Y, 37.3, -6.3) == (9, 6)
+    assert v.pixel_index(X, Y, 37.3, -6.3) == (9, 6)
 
 
 def test_metrics():
-    m = v._metrics([21.0, 20.0, 19.0], [20.5, 20.0, 19.5])
+    m = v.metrics([21.0, 20.0, 19.0], [20.5, 20.0, 19.5])
     assert m["n"] == 3
     assert m["mae"] == pytest.approx(1 / 3, abs=1e-3)
     assert m["bias"] == pytest.approx(0.0, abs=1e-9)
@@ -47,21 +47,22 @@ def test_measured_site_without_audit_decision_is_rejected(tmp_path, monkeypatch)
     )
     monkeypatch.setattr(v, "VALIDATION_DIR", tmp_path)
     with pytest.raises(ValueError, match="without an audit decision"):
-        v._load_published_sites()
+        v.load_published_sites()
 
 
 def test_repository_audit_covers_every_measured_site():
-    published = v._load_published_sites()
+    published = v.load_published_sites()
     assert published is not None
     assert set(published["use"]) <= {"primary", "indicative", "excluded"}
 
 
 def test_validation_dir_env_override(monkeypatch, tmp_path):
     monkeypatch.setenv("VALIDATION_DIR", str(tmp_path))
-    assert v._find_validation_dir() == tmp_path
+    assert v.find_validation_dir() == tmp_path
 
 
 def test_validation_dir_found_in_repo_layout(monkeypatch):
     monkeypatch.delenv("VALIDATION_DIR", raising=False)
-    found = v._find_validation_dir()
-    assert found.is_dir() and found.parts[-2:] == ("validation", "portugal")
+    found = v.find_validation_dir()
+    assert found.is_dir()
+    assert found.parts[-2:] == ("validation", "portugal")

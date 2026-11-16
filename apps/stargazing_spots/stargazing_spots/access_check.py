@@ -1,155 +1,82 @@
-"""Nighttime accessibility from OSM tags.
+"""Night access hints from OSM tags. Heuristics; all scores are design choices."""
 
-Classifies spots as drive_up, short_walk, hike_required, or boat_required
-based on feature type and access/barrier tags.
-"""
-
-import logging
+from typing import Any
 
 import geopandas as gpd
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from stargazing_spots.land_cover import LAND_COVER_CLASSES
 
-# Tags indicating nighttime accessibility
-POSITIVE_ACCESS_TAGS = {
-    "tourism": ["camp_site", "viewpoint", "picnic_site", "wilderness_hut"],
-    "amenity": ["shelter"],
-    "leisure": ["nature_reserve"],
-}
+DEFAULT_SCORE = 0.7
 
-# Tags indicating restricted/problematic access
-NEGATIVE_ACCESS_TAGS = {
-    "access": ["private", "no", "customers", "permit"],
-    "barrier": ["gate", "lift_gate", "bollard", "fence"],
-    "lit": ["yes"],  # Lit = light pollution at the spot itself
-}
-
-# Feature types and their typical accessibility
-FEATURE_ACCESS_TYPE = {
-    # Drive-up (roadside, parking expected)
+# Feature value -> typical access, looked up in tourism, natural, man_made, amenity (in order).
+ACCESS_BY_FEATURE = {
     "viewpoint": "drive_up",
     "camp_site": "drive_up",
     "picnic_site": "drive_up",
     "wilderness_hut": "drive_up",
     "observatory": "drive_up",
     "shelter": "short_walk",
-    # May require walking
     "peak": "short_walk",
     "hill": "short_walk",
     "ridge": "hike_required",
     "saddle": "hike_required",
-    # Open terrain (varies)
     "grassland": "unknown",
     "heath": "unknown",
     "bare_rock": "short_walk",
     "cliff": "short_walk",
 }
+FEATURE_KEYS = ("tourism", "natural", "man_made", "amenity")
+POSITIVE_TAGS = {
+    "tourism": ("camp_site", "viewpoint", "picnic_site", "wilderness_hut"),
+    "amenity": ("shelter",),
+    "leisure": ("nature_reserve",),
+}
+RESTRICTED_ACCESS = ("private", "no", "customers", "permit")
+BARRIERS = ("gate", "lift_gate", "bollard", "fence")
+ISLAND_CLASSES = tuple(
+    k for k, v in LAND_COVER_CLASSES.items() if v in ("water", "herbaceous_wetland")
+)
+
+
+def _tag(row: pd.Series, key: str) -> str | None:
+    value = row.get(key)
+    return None if value is None or pd.isna(value) else str(value)
+
+
+def _assess_row(row: pd.Series) -> tuple[str, bool, str, float]:
+    access_type = next(
+        (ACCESS_BY_FEATURE[v] for k in FEATURE_KEYS if (v := _tag(row, k)) in ACCESS_BY_FEATURE),
+        "unknown",
+    )
+    accessible, score, warnings = True, DEFAULT_SCORE, []
+
+    if any(_tag(row, k) in values for k, values in POSITIVE_TAGS.items()):
+        score = max(score, 0.9)
+    if (access := _tag(row, "access")) in RESTRICTED_ACCESS:
+        accessible, score = False, 0.0
+        warnings.append(f"access={access}")
+    if (barrier := _tag(row, "barrier")) in BARRIERS:
+        accessible, score = False, 0.1
+        warnings.append(f"barrier={barrier} (may be locked at night)")
+    if _tag(row, "lit") == "yes":
+        warnings.append("lit=yes (local light pollution)")
+        score = min(score, 0.5)
+
+    if row.get("dem_elevation_m") == 0 and row.get("land_cover_class") in ISLAND_CLASSES:
+        access_type, score = "boat_required", 0.3
+        warnings.append("offshore island (boat access only)")
+
+    if access_type == "drive_up":
+        score = min(score + 0.1, 1.0)
+    elif access_type == "hike_required":
+        score = min(score, 0.5)
+        warnings.append("may require hiking (no nearby road)")
+    return access_type, accessible, "; ".join(warnings), round(score, 2)
 
 
 def assess_access(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Assess nighttime accessibility for each spot.
-
-    Uses OSM tags already on the features to determine:
-    - Is it accessible at night? (no gate, no private tag)
-    - What type of access? (drive-up, short walk, hike)
-    - Any warnings? (lit, restricted)
-
-    Args:
-        spots: GeoDataFrame with OSM feature tags.
-
-    Returns:
-        GeoDataFrame with added columns:
-            - access_type: "drive_up" | "short_walk" | "hike_required" | "unknown"
-            - night_accessible: True/False/None (None = unknown)
-            - access_warnings: list of warning strings
-            - access_score: 0-1 (1 = definitely accessible at night)
-    """
-    spots = spots.copy()
-
-    access_types = []
-    night_accessible = []
-    access_warnings_list = []
-    access_scores = []
-
-    for _, row in spots.iterrows():
-        warnings = []
-        access_type = "unknown"
-        accessible = True  # assume accessible unless evidence says otherwise
-        score = 0.7  # default; all access scores in this function are design choices
-
-        # Determine access type from feature tags
-        for tag_col, type_map in [
-            ("tourism", FEATURE_ACCESS_TYPE),
-            ("natural", FEATURE_ACCESS_TYPE),
-            ("man_made", FEATURE_ACCESS_TYPE),
-            ("amenity", FEATURE_ACCESS_TYPE),
-        ]:
-            if tag_col in row.index and pd.notna(row.get(tag_col)):
-                val = str(row[tag_col])
-                if val in type_map:
-                    access_type = type_map[val]
-                    break
-
-        # Check for positive indicators
-        for tag_col, good_vals in POSITIVE_ACCESS_TAGS.items():
-            if tag_col in row.index and pd.notna(row.get(tag_col)):
-                if str(row[tag_col]) in good_vals:
-                    score = max(score, 0.9)
-
-        # Check for negative indicators
-        for tag_col, bad_vals in NEGATIVE_ACCESS_TAGS.items():
-            if tag_col in row.index and pd.notna(row.get(tag_col)):
-                if str(row[tag_col]) in bad_vals:
-                    if tag_col == "access":
-                        accessible = False
-                        score = 0.0
-                        warnings.append(f"access={row[tag_col]}")
-                    elif tag_col == "barrier":
-                        accessible = False
-                        score = 0.1
-                        warnings.append(f"barrier={row[tag_col]} (may be locked at night)")
-                    elif tag_col == "lit":
-                        warnings.append("lit=yes (local light pollution)")
-                        score = min(score, 0.5)
-
-        # Detect offshore islands: DEM=0 + wetland/water land cover
-        dem_elev = row.get("dem_elevation_m") if "dem_elevation_m" in row.index else None
-        lc_class = row.get("land_cover_class") if "land_cover_class" in row.index else None
-        if dem_elev is not None and dem_elev == 0 and lc_class in (80, 90):
-            access_type = "boat_required"
-            score = 0.3
-            warnings.append("offshore island (boat access only)")
-
-        # Adjust score by access type
-        if access_type == "drive_up":
-            score = min(score + 0.1, 1.0)
-        elif access_type == "hike_required":
-            score = min(score, 0.5)
-            warnings.append("may require hiking (no nearby road)")
-
-        access_types.append(access_type)
-        night_accessible.append(accessible)
-        access_warnings_list.append("; ".join(warnings) if warnings else "")
-        access_scores.append(round(score, 2))
-
-    spots["access_type"] = access_types
-    spots["night_accessible"] = night_accessible
-    spots["access_warnings"] = access_warnings_list
-    spots["access_score"] = access_scores
-
-    # Summary
-    logger.info("Accessibility assessment:")
-    for atype in ["drive_up", "short_walk", "hike_required", "boat_required", "unknown"]:
-        count = access_types.count(atype)
-        if count > 0:
-            logger.info("  %s: %d spots", atype, count)
-
-    n_restricted = sum(1 for a in night_accessible if not a)
-    n_lit = sum(1 for w in access_warnings_list if "lit=yes" in w)
-    if n_restricted > 0:
-        logger.info("  Restricted access: %d spots", n_restricted)
-    if n_lit > 0:
-        logger.info("  Lit (local light pollution): %d spots", n_lit)
-
-    return spots
+    """Add ``access_type``, ``night_accessible``, ``access_warnings`` and ``access_score``."""
+    rows: list[tuple[Any, ...]] = [_assess_row(row) for _, row in spots.iterrows()]
+    columns = ("access_type", "night_accessible", "access_warnings", "access_score")
+    return spots.assign(**{c: [r[i] for r in rows] for i, c in enumerate(columns)})

@@ -1,215 +1,86 @@
-"""Full multi-criteria assessment runner.
-
-Orchestrates all assessment layers on a set of candidate spots:
-    1. Skyglow PSF prediction (predicted SQM)
-    2. ERA5 cloud cover (clear-night fraction)
-    3. Sky View Factor (terrain openness)
-    4. ESA WorldCover (land cover suitability)
-    5. Terrain slope (accessibility)
-    6. SSI computation (weighted combination)
-    7. Final filtering (remove unsuitable spots)
-
-This is the final step before export -- it takes raw OSM-enriched spots
-and produces the scientifically-scored, multi-criteria-filtered output.
-"""
+"""Multi-criteria assessment of candidate spots, selection and spatial thinning."""
 
 import logging
-import time
 
 import geopandas as gpd
 import numpy as np
+import numpy.typing as npt
+from scipy.spatial import cKDTree
+
+from stargazing_spots.access_check import assess_access
+from stargazing_spots.cloud_cover import compute_clear_night_fraction, resample_to_viirs_grid
+from stargazing_spots.config import RegionName
+from stargazing_spots.geo import FloatArray, sample
+from stargazing_spots.land_cover import (
+    LAND_COVER_CLASSES,
+    REMOVED_CLASSES,
+    canopy_fraction,
+    land_cover_at_points,
+)
+from stargazing_spots.skyglow import assess_spots as add_skyglow
+from stargazing_spots.suitability import compute_ssi
+from stargazing_spots.terrain import classify_slope, terrain_at_points
 
 logger = logging.getLogger(__name__)
 
-
-def run_full_assessment(
-    spots: gpd.GeoDataFrame,
-    radiance: np.ndarray,
-    x_coords: np.ndarray,
-    y_coords: np.ndarray,
-    region: str = "mainland",
-) -> gpd.GeoDataFrame:
-    """Run all multi-criteria assessment layers on a set of spots.
-
-    Args:
-        spots: GeoDataFrame with Point geometry (output of enrichment step).
-        radiance: Full 2D radiance grid (3-year median, all pixels).
-        x_coords: VIIRS grid longitude coordinates.
-        y_coords: VIIRS grid latitude coordinates.
-        region: Region name for cloud cover cache lookup.
-
-    Returns:
-        GeoDataFrame with all assessment columns added and SSI computed.
-    """
-    t0 = time.time()
-    spots = spots.copy()
-    n_initial = len(spots)
-    logger.info("=" * 60)
-    logger.info("MULTI-CRITERIA ASSESSMENT: %d spots", n_initial)
-    logger.info("=" * 60)
-
-    # 1. Skyglow PSF -> predicted SQM
-    logger.info("--- [1/6] Skyglow propagation (PSF convolution) ---")
-    from stargazing_spots.skyglow import assess_spots as skyglow_assess
-
-    spots = skyglow_assess(spots, radiance, x_coords, y_coords)
-    logger.info("  Done: mean SQM = %.2f", spots["predicted_sqm"].mean())
-
-    # 2. Cloud cover (ERA5 hourly clear-night fraction)
-    logger.info("--- [2/7] Cloud cover (clear-night fraction) ---")
-    try:
-        from stargazing_spots.cloud_cover import (
-            compute_clear_night_fraction,
-            resample_to_viirs_grid,
-        )
-
-        clear_fraction_era5 = compute_clear_night_fraction(region=region)
-        # Resample ERA5 grid to VIIRS coordinates, then sample at spot locations
-        clear_resampled = resample_to_viirs_grid(clear_fraction_era5, x_coords, y_coords)
-
-        # Sample at spot locations
-        spot_cols = np.array([int(np.argmin(np.abs(x_coords - g.x))) for g in spots.geometry])
-        spot_rows = np.array([int(np.argmin(np.abs(y_coords - g.y))) for g in spots.geometry])
-        clear_at_spots = np.array(
-            [
-                clear_resampled[r, c]
-                if 0 <= r < clear_resampled.shape[0] and 0 <= c < clear_resampled.shape[1]
-                else np.nan
-                for r, c in zip(spot_rows, spot_cols)
-            ]
-        )
-        spots["clear_night_fraction"] = np.round(clear_at_spots, 3)
-        logger.info("  Done: mean clear fraction = %.1f%%", np.nanmean(clear_at_spots) * 100)
-    except Exception as e:
-        logger.warning("  Cloud cover FAILED: %s (continuing without)", e)
-        spots["clear_night_fraction"] = np.nan
-
-    # 3-5. SVF + Land cover + Slope -- run in PARALLEL (all are independent HTTP I/O)
-    logger.info("--- [3-5/7] SVF + Land cover + Slope (parallel) ---")
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-
-    def _compute_svf():
-        from stargazing_spots.sky_view import compute_svf_at_points
-
-        return compute_svf_at_points(spots)  # Returns (svf, dem_elevation) tuple
-
-    def _compute_land_cover():
-        from stargazing_spots.land_cover import get_land_cover_at_points
-
-        return get_land_cover_at_points(spots)
-
-    def _compute_slope():
-        from stargazing_spots.accessibility import compute_slope_at_points
-
-        return compute_slope_at_points(spots)
-
-    svf_result = None
-    lc_result = None
-    slope_result = None
-
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = {
-            executor.submit(_compute_svf): "svf",
-            executor.submit(_compute_land_cover): "land_cover",
-            executor.submit(_compute_slope): "slope",
-        }
-
-        for future in as_completed(futures):
-            task_name = futures[future]
-            try:
-                result = future.result()
-                if task_name == "svf":
-                    svf_result = result
-                    logger.info("  SVF done: mean=%.3f", np.nanmean(result))
-                elif task_name == "land_cover":
-                    lc_result = result
-                    logger.info("  Land cover done")
-                elif task_name == "slope":
-                    slope_result = result
-                    logger.info("  Slope done: mean=%.1f deg", np.nanmean(result))
-            except Exception as e:
-                logger.warning("  %s FAILED: %s", task_name, e)
-
-    # Apply SVF results (returns tuple: svf_array, dem_elevation_array)
-    if svf_result is not None:
-        svf_values, dem_elev = svf_result
-        spots["sky_view_factor"] = np.round(svf_values, 3)
-        spots["dem_elevation_m"] = np.round(dem_elev, 0)
-        # Use DEM elevation instead of OSM 'ele' tag (100% coverage, authoritative)
-        spots["ele"] = dem_elev
-    else:
-        spots["sky_view_factor"] = np.nan
-        spots["dem_elevation_m"] = np.nan
-
-    # Apply land cover results
-    if lc_result is not None:
-        from stargazing_spots.land_cover import LAND_COVER_CLASSES
-
-        class_codes, lc_scores = lc_result
-        spots["land_cover_class"] = class_codes
-        spots["land_cover_label"] = [LAND_COVER_CLASSES.get(c, "unknown") for c in class_codes]
-        spots["land_cover_score"] = lc_scores
-    else:
-        spots["land_cover_score"] = np.nan
-
-    # Apply slope results
-    if slope_result is not None:
-        from stargazing_spots.accessibility import classify_slope
-
-        spots["terrain_slope_deg"] = np.round(slope_result, 1)
-        scores_labels = [classify_slope(s) for s in slope_result]
-        spots["slope_score"] = [s[0] for s in scores_labels]
-        spots["slope_class"] = [s[1] for s in scores_labels]
-    else:
-        spots["slope_score"] = np.nan
-
-    # 6. Nighttime accessibility check
-    logger.info("--- [6/7] Nighttime accessibility ---")
-    try:
-        from stargazing_spots.access_check import assess_access
-
-        spots = assess_access(spots)
-        n_restricted = (~spots["night_accessible"]).sum()
-        if n_restricted > 0:
-            logger.info("  Warning: %d spots have restricted access", n_restricted)
-    except Exception as e:
-        logger.warning("  Access check FAILED: %s (continuing without)", e)
-
-    # 7. Compute SSI (weighted combination of all layers)
-    logger.info("--- [7/7] Stargazing Suitability Index (SSI) ---")
-    from stargazing_spots.suitability import compute_ssi
-
-    spots = compute_ssi(spots)
-
-    # Summary
-    elapsed = time.time() - t0
-    logger.info("=" * 60)
-    logger.info("ASSESSMENT COMPLETE (%.1fs)", elapsed)
-    logger.info("=" * 60)
-    for cls in ["excellent", "good", "acceptable", "marginal", "poor"]:
-        count = (spots["ssi_class"] == cls).sum()
-        if count > 0:
-            logger.info("  %s: %d spots", cls, count)
-    logger.info("  Total: %d spots assessed", len(spots))
-
-    return spots
-
-
-DEDUP_RADIUS_M = 1000  # product choice: one recommendation per ~1 km
-DENSITY_CELL_DEG = 0.25  # product choice: ~25 km cells
+MIN_SVF = 0.7  # design choice
+DEDUP_RADIUS_M = 1000  # design choice: one recommendation per ~1 km
+DENSITY_CELL_DEG = 0.25  # design choice: ~25 km cells
 DENSITY_MAX_PER_CELL = 5
+DENSITY_MIN_SPOTS = 100  # the cap applies only above this many spots (design choice)
+UTM_29N = 32629
+MIN_SPLIT_VALUES = 2
+
+DESTINATION_TAGS = {
+    "tourism": ("viewpoint", "camp_site", "picnic_site", "wilderness_hut"),
+    "amenity": ("shelter",),
+    "man_made": ("observatory",),
+    "leisure": ("nature_reserve", "bird_hide"),
+}
 
 
-def two_class_split(values) -> float:
-    """Threshold that splits ``values`` into two classes with maximum between-class
-    variance (Otsu 1979; equivalent to a two-class Jenks natural-breaks split).
+def assess(
+    spots: gpd.GeoDataFrame,
+    radiance: FloatArray,
+    x: FloatArray,
+    y: FloatArray,
+    region: RegionName,
+) -> gpd.GeoDataFrame:
+    """Add sky brightness, cloud, terrain, land cover, access and SSI columns."""
+    spots = add_skyglow(spots, radiance, x, y)
+    lon, lat = spots.geometry.x.values, spots.geometry.y.values
+
+    clear = resample_to_viirs_grid(compute_clear_night_fraction(region=region), x, y)
+    terrain = terrain_at_points(lon, lat)
+    canopy = canopy_fraction(lon, lat)
+    classes, land_scores = land_cover_at_points(lon, lat, canopy)
+    slope = [classify_slope(s) for s in terrain.slope_deg]
+
+    spots = spots.assign(
+        clear_night_fraction=np.round(sample(clear, x, y, lon, lat), 3),
+        sky_view_factor=np.round(terrain.svf * (1 - canopy), 3),
+        dem_elevation_m=np.round(terrain.elevation_m, 0),
+        ele=terrain.elevation_m,
+        land_cover_class=classes,
+        land_cover_label=[LAND_COVER_CLASSES.get(int(c), "unknown") for c in classes],
+        land_cover_score=land_scores,
+        terrain_slope_deg=np.round(terrain.slope_deg, 1),
+        slope_score=[s for s, _ in slope],
+        slope_class=[label for _, label in slope],
+    )
+    return compute_ssi(assess_access(spots))
+
+
+def two_class_split(values: npt.ArrayLike) -> float:
+    """Threshold with maximum between-class variance (Otsu 1979; two-class Jenks).
+
     Returns the midpoint between the last value of the lower class and the first
     of the upper class.
     """
-    v = np.sort(np.asarray(values, dtype=float))
+    v = np.sort(np.asarray(values, dtype=np.float64))
     v = v[~np.isnan(v)]
     n = len(v)
-    if n < 2 or v[0] == v[-1]:
+    if n < MIN_SPLIT_VALUES or v[0] == v[-1]:
         return float(v[0]) if n else float("nan")
     k = np.arange(1, n)
     csum = np.cumsum(v)
@@ -221,14 +92,46 @@ def two_class_split(values) -> float:
     return float((v[i] + v[i + 1]) / 2)
 
 
-def ssi_percentile(values, reference) -> np.ndarray:
-    """Share of ``reference`` SSI values that are <= each value (0-1)."""
-    ref = np.sort(np.asarray(reference, dtype=float))
-    return np.searchsorted(ref, np.asarray(values, dtype=float), side="right") / max(len(ref), 1)
+def ssi_percentile(values: npt.ArrayLike, reference: npt.ArrayLike) -> FloatArray:
+    """Share of ``reference`` values that are <= each value (0-1)."""
+    ref = np.sort(np.asarray(reference, dtype=np.float64))
+    position = np.searchsorted(ref, np.asarray(values, dtype=np.float64), side="right")
+    return position / max(len(ref), 1)
+
+
+def filter_physical(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Drop obstructed sky, built-up/water land cover and night-restricted access."""
+    return spots[
+        ~(spots["sky_view_factor"] < MIN_SVF)
+        & ~spots["land_cover_class"].isin(REMOVED_CLASSES)
+        & spots["night_accessible"].astype(bool)
+    ]
+
+
+def select_spots(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Physical filters, upper class of the region's two-class SSI split, tier, thinning.
+
+    The split is computed per call (one region), so each region is ranked against
+    its own climate. Keeping the upper class is a design choice.
+    """
+    spots = filter_physical(spots)
+    split = two_class_split(spots["ssi_score"])
+    spots = spots.assign(
+        ssi_percentile=np.round(ssi_percentile(spots["ssi_score"], spots["ssi_score"]), 3)
+    )
+    spots = spots[spots["ssi_score"] >= split]  # also drops missing SSI
+    logger.info("SSI split %.1f: %d spots", split, len(spots))
+
+    is_destination = np.zeros(len(spots), dtype=bool)
+    for key, values in DESTINATION_TAGS.items():
+        if key in spots.columns:
+            is_destination |= spots[key].isin(values).to_numpy()
+    spots = spots.assign(tier=np.where(is_destination, "destination", "candidate"))
+    return thin_spatially(spots).reset_index(drop=True)
 
 
 def _rank_order(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Best first: SSI descending, ties broken by OSM id, so results never depend on input order."""
+    """SSI descending, ties by OSM id, so the order never depends on input order."""
     tiebreak = spots["id"].astype(str) if "id" in spots.columns else spots.index.astype(str)
     return (
         spots.assign(_tiebreak=tiebreak)
@@ -238,130 +141,28 @@ def _rank_order(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 def thin_spatially(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Deduplicate within DEDUP_RADIUS_M, then cap spots per fixed grid cell.
+    """Best-first deduplication, then a per-cell cap on a fixed grid.
 
-    Deterministic: the output depends only on the set of spots, not their order.
-    - Deduplication is greedy non-maximum suppression: spots are visited
-      best-first and any spot within DEDUP_RADIUS_M of a kept spot is dropped.
-    - The density grid is anchored at fixed multiples of DENSITY_CELL_DEG
-      (not at the data's minimum lat/lon), so adding or removing a spot only
-      affects its own cell.
+    Spots within DEDUP_RADIUS_M of a better one are dropped; then at most
+    DENSITY_MAX_PER_CELL remain per DENSITY_CELL_DEG cell. The result depends only
+    on the set of spots, not their order.
     """
-    if "ssi_score" not in spots.columns or len(spots) <= 1:
+    if len(spots) <= 1:
         return spots
-    from scipy.spatial import cKDTree
-
     ranked = _rank_order(spots).reset_index(drop=True)
-    utm = ranked.to_crs(epsg=32629)
+    utm = ranked.to_crs(epsg=UTM_29N)
     coords = np.column_stack([utm.geometry.x, utm.geometry.y])
     tree = cKDTree(coords)
     suppressed = np.zeros(len(ranked), dtype=bool)
     keep = []
     for i in range(len(ranked)):
-        if suppressed[i]:
-            continue
-        keep.append(i)
-        suppressed[tree.query_ball_point(coords[i], r=DEDUP_RADIUS_M)] = True
-    n_dup = len(ranked) - len(keep)
+        if not suppressed[i]:
+            keep.append(i)
+            suppressed[tree.query_ball_point(coords[i], r=DEDUP_RADIUS_M)] = True
     ranked = ranked.iloc[keep]
-    if n_dup:
-        logger.info(
-            "  Deduplication: removed %d spots within %d m of a better spot", n_dup, DEDUP_RADIUS_M
-        )
 
-    if len(ranked) > 100:
+    if len(ranked) > DENSITY_MIN_SPOTS:
         cell_y = np.floor(ranked.geometry.y / DENSITY_CELL_DEG).astype(int)
         cell_x = np.floor(ranked.geometry.x / DENSITY_CELL_DEG).astype(int)
-        capped = ranked.groupby([cell_y, cell_x], sort=False).head(DENSITY_MAX_PER_CELL)
-        n_cap = len(ranked) - len(capped)
-        ranked = capped
-        if n_cap:
-            logger.info(
-                "  Density cap: removed %d spots (max %d per %.2f deg cell, fixed grid)",
-                n_cap,
-                DENSITY_MAX_PER_CELL,
-                DENSITY_CELL_DEG,
-            )
+        ranked = ranked.groupby([cell_y, cell_x], sort=False).head(DENSITY_MAX_PER_CELL)
     return ranked
-
-
-def filter_physical(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Remove obstructed (SVF), urban/water and night-restricted candidates."""
-
-    # Primary filter: SVF >= 0.7 (design choice)
-    if "sky_view_factor" in spots.columns:
-        obstructed = spots["sky_view_factor"] < 0.7
-        n_obstructed = obstructed.sum()
-        spots = spots[~obstructed]
-        if n_obstructed > 0:
-            logger.info("  Removed %d spots (SVF < 0.7: insufficient sky visibility)", n_obstructed)
-
-    # Secondary filter: water and dense built-up only (NOT tree cover -- handled by SVF)
-    if "land_cover_class" in spots.columns:
-        unsuitable_lc = spots["land_cover_class"].isin([50, 80, 95])  # built-up, water, mangrove
-        n_lc = unsuitable_lc.sum()
-        spots = spots[~unsuitable_lc]
-        if n_lc > 0:
-            logger.info("  Removed %d spots (land cover: urban/water)", n_lc)
-
-    # Tertiary filter: remove spots with explicitly restricted nighttime access
-    if "night_accessible" in spots.columns:
-        restricted = ~spots["night_accessible"]
-        n_restricted = restricted.sum()
-        spots = spots[~restricted]
-        if n_restricted > 0:
-            logger.info("  Removed %d spots (access=private/no, barrier=gate)", n_restricted)
-    return spots
-
-
-def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Physical filters, then keep the upper class of a two-class SSI split.
-
-    The split is computed on the physically suitable candidates passed in
-    (one region per call), so each region is ranked against its own climate.
-    Keeping the upper class is a design choice.
-
-    Args:
-        spots: GeoDataFrame with assessment columns (one region).
-
-    Returns:
-        Filtered, tiered and spatially thinned GeoDataFrame.
-    """
-    n_initial = len(spots)
-    spots = filter_physical(spots)
-
-    if "ssi_score" in spots.columns and len(spots) > 0:
-        split = two_class_split(spots["ssi_score"])
-        spots = spots.assign(
-            ssi_percentile=np.round(ssi_percentile(spots["ssi_score"], spots["ssi_score"]), 3)
-        )
-        too_low = ~(spots["ssi_score"] >= split)  # also drops missing SSI
-        n_low = int(too_low.sum())
-        spots = spots[~too_low]
-        logger.info("  Removed %d spots (SSI < %.1f, two-class split)", n_low, split)
-
-    n_final = len(spots)
-    logger.info(
-        "  Filter result: %d -> %d spots (%d removed)", n_initial, n_final, n_initial - n_final
-    )
-
-    # Tiering: classify spots by infrastructure level
-    import pandas as pd
-
-    tier1_tags = {
-        "tourism": ["viewpoint", "camp_site", "picnic_site", "wilderness_hut"],
-        "amenity": ["shelter"],
-        "man_made": ["observatory"],
-        "leisure": ["nature_reserve", "bird_hide"],
-    }
-    is_tier1 = pd.Series(False, index=spots.index)
-    for col, values in tier1_tags.items():
-        if col in spots.columns:
-            is_tier1 |= spots[col].isin(values)
-    spots["tier"] = np.where(is_tier1, "destination", "candidate")
-    n_dest = is_tier1.sum()
-    logger.info("  Tiered: %d destinations + %d candidates", n_dest, n_final - n_dest)
-
-    spots = thin_spatially(spots)
-
-    return spots.reset_index(drop=True)

@@ -17,25 +17,31 @@ class TestBuildPSFKernel:
     """Tests for PSF kernel construction."""
 
     def test_kernel_shape_is_odd(self):
-        psf = build_psf_kernel(radius_km=10, pixel_size_km=0.5)
+        psf = build_psf_kernel(PropagationConfig(integration_radius_km=10, pixel_size_km=0.5))
         assert psf.shape[0] % 2 == 1
         assert psf.shape[1] % 2 == 1
 
     def test_kernel_center_not_zero(self):
         """Softened PSF should have finite value at center (self-pixel)."""
-        psf = build_psf_kernel(radius_km=10, pixel_size_km=0.5, softening_km=1.0)
+        psf = build_psf_kernel(
+            PropagationConfig(integration_radius_km=10, pixel_size_km=0.5, softening_km=1.0)
+        )
         center = psf.shape[0] // 2
         assert psf[center, center] > 0, "Center should NOT be zeroed (self-pixel contribution)"
 
     def test_kernel_center_value(self):
-        """At d=0 with softening d₀=1: PSF = (0+1)^(-2.5) × exp(0) = 1.0."""
-        psf = build_psf_kernel(radius_km=10, pixel_size_km=0.5, softening_km=1.0, exponent=2.5)
+        """At d=0 with softening d₀=1: PSF = (0+1)^(-2.5) x exp(0) = 1.0."""
+        psf = build_psf_kernel(
+            PropagationConfig(
+                integration_radius_km=10, pixel_size_km=0.5, softening_km=1.0, psf_exponent=2.5
+            )
+        )
         center = psf.shape[0] // 2
         assert abs(psf[center, center] - 1.0) < 0.01
 
     def test_kernel_decays_with_distance(self):
         """PSF should decrease monotonically from center."""
-        psf = build_psf_kernel(radius_km=50, pixel_size_km=1.0)
+        psf = build_psf_kernel(PropagationConfig(integration_radius_km=50, pixel_size_km=1.0))
         center = psf.shape[0] // 2
         # Check along a row
         assert psf[center, center] > psf[center, center + 5]
@@ -43,13 +49,13 @@ class TestBuildPSFKernel:
 
     def test_kernel_zero_beyond_radius(self):
         """PSF should be zero outside the integration radius."""
-        psf = build_psf_kernel(radius_km=10, pixel_size_km=0.5)
+        psf = build_psf_kernel(PropagationConfig(integration_radius_km=10, pixel_size_km=0.5))
         # Corner pixel is at distance sqrt(2) * radius > radius
         assert psf[0, 0] == 0.0
 
     def test_kernel_symmetric(self):
         """PSF kernel should be radially symmetric."""
-        psf = build_psf_kernel(radius_km=20, pixel_size_km=1.0)
+        psf = build_psf_kernel(PropagationConfig(integration_radius_km=20, pixel_size_km=1.0))
         center = psf.shape[0] // 2
         # Compare opposite directions
         assert abs(psf[center, center + 5] - psf[center, center - 5]) < 1e-10
@@ -57,8 +63,12 @@ class TestBuildPSFKernel:
 
     def test_extinction_reduces_far_field(self):
         """Atmospheric extinction should make far pixels dimmer."""
-        psf_no_ext = build_psf_kernel(radius_km=50, pixel_size_km=1.0, extinction_rate=0.0)
-        psf_with_ext = build_psf_kernel(radius_km=50, pixel_size_km=1.0, extinction_rate=0.02)
+        psf_no_ext = build_psf_kernel(
+            PropagationConfig(integration_radius_km=50, pixel_size_km=1.0, extinction_rate=0.0)
+        )
+        psf_with_ext = build_psf_kernel(
+            PropagationConfig(integration_radius_km=50, pixel_size_km=1.0, extinction_rate=0.02)
+        )
         center = psf_no_ext.shape[0] // 2
         # At 30km, extinction should reduce PSF
         assert psf_with_ext[center, center + 30] < psf_no_ext[center, center + 30]

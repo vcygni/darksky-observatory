@@ -1,61 +1,46 @@
 """Clear-night climatology from hourly ERA5 total cloud cover.
 
-For each ERA5 grid cell (0.25 deg), 2006-2025:
-
+Per ERA5 cell (0.25 deg), 2006-2025:
     clear_night_fraction = dark hours with TCC < CLEAR_THRESHOLD / dark hours
-
-An hour is dark when the Sun is below -18 deg (astronomical night) at the
-cell's own latitude and longitude at that timestamp. The same definition is
-used for mainland Portugal, Madeira and the Azores.
-
-ERA5 is read from the Destination Earth Earth Data Hub (Zarr, CC BY 4.0),
-which needs an API key in $EDH_TOKEN.
+An hour is dark when the Sun is below -18 deg at the cell's latitude and longitude.
+ERA5 is read from the Destination Earth Earth Data Hub (Zarr, CC BY 4.0); needs $EDH_TOKEN.
 """
 
 import logging
 import os
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 import xarray as xr
+from scipy.interpolate import RegularGridInterpolator
+from scipy.ndimage import uniform_filter
+
+from stargazing_spots.config import CACHE_DIR, REGIONS, RegionName
+from stargazing_spots.geo import FloatArray
 
 logger = logging.getLogger(__name__)
 
 EDH_URL = (
     "https://edh:{token}@api.earthdatahub.destine.eu/era5/era5-single-levels-atmosphere-v0.zarr"
 )
-
-# Design choice: an hour counts as clear when total cloud cover is below 20 %.
-CLEAR_THRESHOLD = 0.2
+CLEAR_THRESHOLD = 0.2  # design choice: an hour is clear below 20 % cloud cover
 ASTRONOMICAL_NIGHT_DEG = -18.0
-
-CLIM_START_YEAR = 2006
-CLIM_END_YEAR = 2025
-REGION_BOUNDS = {
-    "mainland": {"lat": (36.5, 42.5), "lon": (-10.0, -6.0)},
-    "madeira": {"lat": (32.0, 34.0), "lon": (-17.5, -16.0)},
-    "azores": {"lat": (36.5, 40.0), "lon": (-32.0, -25.0)},
-}
-TIME_CHUNK = 2000  # hours processed at once (bounds memory)
+TIME_CHUNK = 2000  # hours per batch (bounds memory)
+EMPTY_CELL_FILL = 0.5  # cells with no data and no neighbours
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ClearSkyConfig:
-    """Configuration for the clear-night climatology."""
-
     clear_threshold: float = CLEAR_THRESHOLD
-    start_year: int = CLIM_START_YEAR
-    end_year: int = CLIM_END_YEAR
-    cache_dir: Path = Path(__file__).parent.parent / "input" / "portugal" / "cache"
+    start_year: int = 2006
+    end_year: int = 2025
 
 
-def sun_altitude(times: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> np.ndarray:
-    """Solar altitude (deg) for UTC ``times`` at ``lat``/``lon`` (deg, east positive).
+def sun_altitude(times: npt.ArrayLike, lat: npt.ArrayLike, lon: npt.ArrayLike) -> FloatArray:
+    """Solar altitude (deg) for UTC times at lat/lon (deg, east positive); broadcasts.
 
-    NOAA "General Solar Position Calculations" (fractional-year series for
-    declination and equation of time). Inputs broadcast with numpy rules, e.g.
-    times (T, 1, 1), lat (1, Y, 1), lon (1, 1, X).
+    NOAA "General Solar Position Calculations" (fractional-year series).
     """
     t = np.asarray(times, dtype="datetime64[s]")
     year_start = t.astype("datetime64[Y]")
@@ -87,78 +72,73 @@ def sun_altitude(times: np.ndarray, lat: np.ndarray, lon: np.ndarray) -> np.ndar
     hour_angle = np.radians(true_solar_minutes / 4 - 180)
     lat_rad = np.radians(np.asarray(lat, dtype=float))
     sin_alt = np.sin(lat_rad) * np.sin(decl) + np.cos(lat_rad) * np.cos(decl) * np.cos(hour_angle)
-    return np.degrees(np.arcsin(np.clip(sin_alt, -1, 1)))
+    altitude: FloatArray = np.degrees(np.arcsin(np.clip(sin_alt, -1, 1)))
+    return altitude
 
 
 def clear_dark_counts(
-    tcc: np.ndarray, times: np.ndarray, lat: np.ndarray, lon: np.ndarray, threshold: float
-) -> tuple[np.ndarray, np.ndarray]:
-    """(dark-and-clear hours, dark hours) per cell for hourly TCC of shape (T, Y, X)."""
-    alt = sun_altitude(times[:, None, None], lat[None, :, None], lon[None, None, :])
+    tcc: FloatArray, times: npt.ArrayLike, lat: FloatArray, lon: FloatArray, threshold: float
+) -> tuple[npt.NDArray[np.int_], npt.NDArray[np.int_]]:
+    """(dark and clear hours, dark hours) per cell for hourly TCC shaped (T, Y, X)."""
+    alt = sun_altitude(np.asarray(times)[:, None, None], lat[None, :, None], lon[None, None, :])
     dark = (alt < ASTRONOMICAL_NIGHT_DEG) & ~np.isnan(tcc)
     clear = dark & (tcc < threshold)
     return clear.sum(axis=0), dark.sum(axis=0)
 
 
 def open_era5_tcc() -> xr.DataArray:
-    """Lazy ERA5 hourly total cloud cover from the Earth Data Hub (longitude 0-360)."""
+    """Lazy ERA5 hourly total cloud cover (longitude 0-360)."""
     token = os.environ.get("EDH_TOKEN")
     if not token:
-        raise RuntimeError("EDH_TOKEN is not set (Earth Data Hub API key)")
-    return xr.open_dataset(EDH_URL.format(token=token), engine="zarr", chunks={})["tcc"]
+        msg = "EDH_TOKEN is not set (Earth Data Hub API key)"
+        raise RuntimeError(msg)
+    tcc: xr.DataArray = xr.open_dataset(EDH_URL.format(token=token), engine="zarr", chunks={})[
+        "tcc"
+    ]
+    return tcc
 
 
 def compute_clear_night_fraction(
-    config: ClearSkyConfig | None = None,
-    region: str = "mainland",
+    region: RegionName, config: ClearSkyConfig = ClearSkyConfig()
 ) -> xr.DataArray:
-    """Clear-night fraction on the ERA5 grid for ``region`` (see module docstring)."""
-    if config is None:
-        config = ClearSkyConfig()
-    if region not in REGION_BOUNDS:
-        raise ValueError(f"Unknown region {region!r}; expected one of {list(REGION_BOUNDS)}")
-
-    cache_file = config.cache_dir / (
+    """Clear-night fraction on the ERA5 grid; cached in input/portugal/cache."""
+    cache_file = CACHE_DIR / (
         f"era5_clear_night_hourly_{region}_{config.start_year}_{config.end_year}"
         f"_tcc{config.clear_threshold:g}.nc"
     )
     if cache_file.exists():
-        logger.info("Loading cached clear-night fraction: %s", cache_file.name)
         return xr.open_dataarray(cache_file)
 
-    b = REGION_BOUNDS[region]
+    west, south, east, north = REGIONS[region].cloud_bbox
     tcc = (
         open_era5_tcc()
-        .sel(
-            latitude=slice(b["lat"][1], b["lat"][0]),
-            longitude=slice(b["lon"][0] % 360, b["lon"][1] % 360),
-        )
+        .sel(latitude=slice(north, south), longitude=slice(west % 360, east % 360))
         .transpose("valid_time", "latitude", "longitude")
     )
     lat = tcc["latitude"].values
-    lon = (tcc["longitude"].values + 180) % 360 - 180  # back to -180..180
-    clear_total = dark_total = None
+    lon = (tcc["longitude"].values + 180) % 360 - 180
+    clear_total = np.zeros((len(lat), len(lon)), dtype=np.int64)
+    dark_total = np.zeros_like(clear_total)
     for year in range(config.start_year, config.end_year + 1):
         yearly = tcc.sel(valid_time=slice(f"{year}-01-01", f"{year}-12-31T23"))
         times = yearly["valid_time"].values
-        logger.info("ERA5 TCC %s %d: %d hours", region, year, len(times))
         for start in range(0, len(times), TIME_CHUNK):
             part = slice(start, start + TIME_CHUNK)
             clear, dark = clear_dark_counts(
                 yearly[part].values, times[part], lat, lon, config.clear_threshold
             )
-            clear_total = clear if clear_total is None else clear_total + clear
-            dark_total = dark if dark_total is None else dark_total + dark
+            clear_total += clear
+            dark_total += dark
+        logger.info("ERA5 cloud cover %s %d: %d hours", region, year, len(times))
 
     with np.errstate(divide="ignore", invalid="ignore"):
         fraction = np.where(dark_total > 0, clear_total / dark_total, np.nan)
-
     result = xr.DataArray(
         fraction,
         dims=["latitude", "longitude"],
         coords={"latitude": lat, "longitude": lon},
         attrs={
-            "long_name": "Clear-night fraction",
+            "long_name": "clear-night fraction",
             "units": "1",
             "definition": (
                 f"dark hours (Sun < {ASTRONOMICAL_NIGHT_DEG:g} deg) with total cloud cover"
@@ -168,74 +148,37 @@ def compute_clear_night_fraction(
             "source": "ERA5 hourly single levels, tcc (Earth Data Hub, CC BY 4.0)",
         },
     )
-    config.cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
     result.to_netcdf(cache_file)
-    valid = fraction[~np.isnan(fraction)]
-    logger.info(
-        "Clear-night fraction %s: %.1f-%.1f %% (mean %.1f %%)",
-        region,
-        100 * valid.min(),
-        100 * valid.max(),
-        100 * valid.mean(),
-    )
     return result
 
 
 def resample_to_viirs_grid(
-    clear_fraction: xr.DataArray,
-    target_x: np.ndarray,
-    target_y: np.ndarray,
-) -> np.ndarray:
-    """Resample clear-night fraction to the VIIRS 500m grid.
+    clear_fraction: xr.DataArray, target_x: FloatArray, target_y: FloatArray
+) -> FloatArray:
+    """Bilinear interpolation to the VIIRS grid.
 
-    Bilinear interpolation from the ERA5 0.25 deg grid. Cells without a value
-    are filled from the 3x3 neighbourhood mean, then with 0.5 if still empty.
-
-    Args:
-        clear_fraction: Source-resolution clear-night fraction (lat x lon).
-        target_x: VIIRS grid longitude coordinates.
-        target_y: VIIRS grid latitude coordinates.
-
-    Returns:
-        2D array matching VIIRS grid shape with interpolated clear-night fraction.
+    Empty ERA5 cells take the mean of their 3x3 neighbourhood, else EMPTY_CELL_FILL.
     """
-    from scipy.interpolate import RegularGridInterpolator
-
     src_lat = clear_fraction.latitude.values
     src_lon = clear_fraction.longitude.values
     values = clear_fraction.values
 
-    # Handle NaN for interpolation (replace with nearest valid)
     mask = np.isnan(values)
     if mask.any():
-        from scipy.ndimage import uniform_filter
-
-        filled = np.where(mask, 0, values)
-        count = np.where(mask, 0, 1.0)
-        filled_smooth = uniform_filter(filled, size=3, mode="constant")
-        count_smooth = uniform_filter(count, size=3, mode="constant")
+        filled = uniform_filter(np.where(mask, 0, values), size=3, mode="constant")
+        count = uniform_filter(np.where(mask, 0, 1.0), size=3, mode="constant")
         with np.errstate(divide="ignore", invalid="ignore"):
-            values = np.where(mask & (count_smooth > 0), filled_smooth / count_smooth, values)
-        values = np.nan_to_num(values, nan=0.5)  # fallback for remaining NaN
+            values = np.where(mask & (count > 0), filled / count, values)
+        values = np.nan_to_num(values, nan=EMPTY_CELL_FILL)
 
-    # Build interpolator (lat may be descending, need to flip for RegularGridInterpolator)
     if src_lat[0] > src_lat[-1]:
-        src_lat = src_lat[::-1]
-        values = values[::-1, :]
-
+        src_lat, values = src_lat[::-1], values[::-1, :]
     interpolator = RegularGridInterpolator(
-        (src_lat, src_lon),
-        values,
-        method="linear",
-        bounds_error=False,
-        fill_value=None,
+        (src_lat, src_lon), values, method="linear", bounds_error=False, fill_value=None
     )
-
-    # Create target grid points
-    target_yy, target_xx = np.meshgrid(target_y, target_x, indexing="ij")
-    points = np.column_stack([target_yy.ravel(), target_xx.ravel()])
-
-    # Interpolate
-    resampled = interpolator(points).reshape(len(target_y), len(target_x))
-
+    yy, xx = np.meshgrid(target_y, target_x, indexing="ij")
+    resampled: FloatArray = interpolator(np.column_stack([yy.ravel(), xx.ravel()])).reshape(
+        len(target_y), len(target_x)
+    )
     return resampled

@@ -20,32 +20,31 @@ Usage:
 """
 
 import argparse
+import itertools
 import json
 import logging
 import math
 import re
 import time
 from collections import defaultdict
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import osmium
 import rasterio
 
-from stargazing_spots.accessibility import _dem_tile_url
+from stargazing_spots.config import OSM_PBF
+from stargazing_spots.tiles import dem_tile
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_OSM_PBF = (
-    Path(__file__).parent.parent / "input" / "portugal" / "osm" / "portugal-latest.osm.pbf"
-)
 
 # Largest road distance among the 18 official observation points (OP07 Posto de
 # Vigia de Monte Redondo, Arganil), OSM extract 2026-10-06, drivable roads as
 # defined below. Output of scripts/derive_access_thresholds.py.
 MAX_WALK_M = 358
 
-# --- Drivable roads -------------------------------------------------------------
 # Routability follows the OSRM car profile, the same engine that computes the
 # guide's drive times: Project-OSRM/osrm-backend profiles/car.lua and
 # profiles/lib/{way_handlers,access,measure}.lua at commit 214ba8f (2026-09-27).
@@ -134,7 +133,7 @@ OSRM_VEHICLE = {"height": 2.0, "width": 1.9, "length": 4.8, "weight_kg": 2000}
 NO_STOPPING_HIGHWAYS = {"motorway", "motorway_link"}
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Road:
     osm_id: int
     highway: str
@@ -142,25 +141,13 @@ class Road:
     coords: tuple[tuple[float, float], ...]  # (lat, lon)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class AccessPoint:
     kind: str  # road | none
     lat: float | None
     lon: float | None
     walk_m: int | None  # straight-line distance from the road point to the spot
     road_type: str
-
-
-# --- Geometry -----------------------------------------------------------------
-
-
-def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Great-circle distance in metres."""
-    r = 6_371_008.8
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dp, dl = p2 - p1, math.radians(lon2 - lon1)
-    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return 2 * r * math.asin(math.sqrt(a))
 
 
 def nearest_point_on_road(lat: float, lon: float, road: Road) -> tuple[float, float, float]:
@@ -176,7 +163,7 @@ def nearest_point_on_road(lat: float, lon: float, road: Road) -> tuple[float, fl
     ky = 110_540.0
     best = (math.inf, lat, lon)
     pts = [((p_lon - lon) * kx, (p_lat - lat) * ky) for p_lat, p_lon in road.coords]
-    for (ax, ay), (bx, by) in zip(pts, pts[1:], strict=False):
+    for (ax, ay), (bx, by) in itertools.pairwise(pts):
         dx, dy = bx - ax, by - ay
         seg2 = dx * dx + dy * dy
         t = 0.0 if seg2 == 0 else max(0.0, min(1.0, -(ax * dx + ay * dy) / seg2))
@@ -202,10 +189,7 @@ def nearest_road(
     return best
 
 
-# --- OSM tag classification ---------------------------------------------------
-
-
-def _access_value(tags: dict, suffix: str) -> str | None:
+def _access_value(tags: dict[str, str], suffix: str) -> str | None:
     """OSRM Tags.get_forward_backward_by_set + Access.resolve_access for one direction."""
     value = None
     for key in OSRM_ACCESS_HIERARCHY:
@@ -235,12 +219,12 @@ def _number(value: str | None) -> float | None:
     return float(m.group()) if m else None
 
 
-def _too_small(tags: dict) -> bool:
+def _too_small(tags: dict[str, str]) -> bool:
     """OSRM handle_height/width/length/weight for the default car (both directions)."""
     height = _number(tags.get("maxheight:physical") or tags.get("maxheight"))
     if tags.get("maxheight") in ("default", "none", "no-sign", "unsigned"):
         height = None
-    width = (
+    width = _number(
         tags.get("maxwidth:physical")
         or tags.get("maxwidth")
         or tags.get("width")
@@ -256,65 +240,56 @@ def _too_small(tags: dict) -> bool:
         weight *= 1000  # OSM default unit is metric tonnes
     return (
         (height is not None and height < OSRM_VEHICLE["height"])
-        or (_number(width) is not None and _number(width) <= OSRM_VEHICLE["width"])
+        or (width is not None and width <= OSRM_VEHICLE["width"])
         or (length is not None and length < OSRM_VEHICLE["length"])
         or (weight is not None and weight < OSRM_VEHICLE["weight_kg"])
     )
 
 
-def is_drivable(tags: dict) -> bool:
+def _blocked(tags: dict[str, str], hw: str) -> bool:
+    """OSRM blocked_ways, avoid_ways, vehicle dimensions, service and smoothness."""
+    construction = tags.get("construction")
+    return (
+        tags.get("area") == "yes"
+        or tags.get("oneway") == "reversible"
+        or tags.get("impassable") == "yes"
+        or tags.get("status") == "impassable"
+        or bool(construction and construction not in OSRM_CONSTRUCTION_WHITELIST)
+        or hw in OSRM_AVOID_HIGHWAYS
+        or _too_small(tags)
+        or tags.get("service") in OSRM_SERVICE_FORBIDDEN
+        or tags.get("smoothness") == "impassable"  # smoothness_speeds: 0 km/h
+    )
+
+
+def _direction_ok(tags: dict[str, str], hw: str, suffix: str) -> bool:
+    """OSRM access and speed handling for one direction (":forward" or ":backward")."""
+    access = _access_value(tags, suffix)
+    # OSRM routes restricted values only on its restricted_highway_whitelist,
+    # which equals the speed table.
+    restricted_ok = hw in OSRM_HIGHWAY_SPEEDS and access in PUBLIC_RESTRICTED_OK
+    if access in OSRM_ACCESS_BLACKLIST and not restricted_ok:
+        return False
+    if hw in OSRM_HIGHWAY_SPEEDS:
+        return True
+    # No speed for this highway type: OSRM uses default_speed only with a
+    # non-blacklisted access tag (e.g. highway=track + motor_vehicle=yes).
+    return access is not None and access not in OSRM_ACCESS_BLACKLIST
+
+
+def is_drivable(tags: dict[str, str]) -> bool:
     """True if a car can legally drive on this way and stop on it.
 
-    Mirrors OSRM car.lua process_way for the default car (blocked_ways,
-    avoid_ways, dimensions, access, service, speed, smoothness=impassable), then
-    applies the public-access and no-stopping rules described above.
+    Mirrors OSRM car.lua process_way for the default car, then applies the
+    public-access and no-stopping rules described above.
     """
     hw = tags.get("highway")
-    if not hw:
+    if not hw or _blocked(tags, hw):
         return False
-    # WayHandlers.blocked_ways
-    if tags.get("area") == "yes" or tags.get("oneway") == "reversible":
+    if not (_direction_ok(tags, hw, ":forward") or _direction_ok(tags, hw, ":backward")):
         return False
-    if tags.get("impassable") == "yes" or tags.get("status") == "impassable":
-        return False
-    construction = tags.get("construction")
-    if construction and construction not in OSRM_CONSTRUCTION_WHITELIST:
-        return False
-    # WayHandlers.avoid_ways
-    if hw in OSRM_AVOID_HIGHWAYS:
-        return False
-    # WayHandlers.handle_height/width/length/weight
-    if _too_small(tags):
-        return False
-    # WayHandlers.service
-    if tags.get("service") in OSRM_SERVICE_FORBIDDEN:
-        return False
-    # smoothness_speeds: impassable = 0 km/h
-    if tags.get("smoothness") == "impassable":
-        return False
-
-    # WayHandlers.access + speed, per direction: usable if either direction is.
-    def direction_ok(suffix: str) -> bool:
-        access = _access_value(tags, suffix)
-        # OSRM only treats restricted values as routable on its
-        # restricted_highway_whitelist, which equals the speed table.
-        restricted_ok = hw in OSRM_HIGHWAY_SPEEDS and access in PUBLIC_RESTRICTED_OK
-        if access in OSRM_ACCESS_BLACKLIST and not restricted_ok:
-            return False
-        if hw in OSRM_HIGHWAY_SPEEDS:
-            return True
-        # No speed for this highway type: OSRM falls back to default_speed only
-        # for a non-blacklisted access tag (e.g. highway=track + motor_vehicle=yes).
-        return access is not None and access not in OSRM_ACCESS_BLACKLIST
-
-    if not (direction_ok(":forward") or direction_ok(":backward")):
-        return False
-
     # Código da Estrada art. 72.º n.º 2 b) and art. 75.º
     return hw not in NO_STOPPING_HIGHWAYS and tags.get("motorroad") != "yes"
-
-
-# --- Selection ----------------------------------------------------------------
 
 
 def choose_access_point(
@@ -327,12 +302,10 @@ def choose_access_point(
     return AccessPoint("road", lat, lon, round(d), road.highway)
 
 
-# --- Reading the OSM extract --------------------------------------------------
-
 GRID_DEG = 0.02  # ~2 km cells for the coarse "near any spot" spatial filter
 
 
-def grid_cells(lat0: float, lat1: float, lon0: float, lon1: float):
+def grid_cells(lat0: float, lat1: float, lon0: float, lon1: float) -> Iterator[tuple[int, int]]:
     """Grid cells overlapped by a lat/lon box."""
     for i in range(math.floor(lat0 / GRID_DEG), math.floor(lat1 / GRID_DEG) + 1):
         for j in range(math.floor(lon0 / GRID_DEG), math.floor(lon1 / GRID_DEG) + 1):
@@ -351,7 +324,7 @@ def _box(coords: list[tuple[float, float]]) -> tuple[float, float, float, float]
     return min(lats), max(lats), min(lons), max(lons)
 
 
-def _way_coords(way) -> list[tuple[float, float]]:
+def _way_coords(way: osmium.osm.Way) -> list[tuple[float, float]]:
     return [(n.lat, n.lon) for n in way.nodes if n.location.valid()]
 
 
@@ -375,6 +348,8 @@ def load_roads(
     )
     timestamp = fp.header.get("osmosis_replication_timestamp", "")
     for way in fp:
+        if not isinstance(way, osmium.osm.Way):
+            continue
         tags = dict(way.tags)
         if not is_drivable(tags):
             continue
@@ -384,12 +359,14 @@ def load_roads(
     return roads, timestamp
 
 
-def _elevation(lat: float, lon: float, cache: dict) -> float | None:
-    """Copernicus GLO-30 elevation (same tiles as accessibility.py), None if unavailable."""
+def _elevation(
+    lat: float, lon: float, cache: dict[tuple[int, int], rasterio.DatasetReader | None]
+) -> float | None:
+    """Copernicus GLO-30 elevation, None if the tile is unavailable."""
     key = (math.floor(lat), math.floor(lon))
     if key not in cache:
         try:
-            cache[key] = rasterio.open(_dem_tile_url(*key))
+            cache[key] = rasterio.open(dem_tile(*key))
         except rasterio.errors.RasterioIOError:
             cache[key] = None
     src = cache[key]
@@ -399,10 +376,9 @@ def _elevation(lat: float, lon: float, cache: dict) -> float | None:
     return float(src.read(1, window=((row, row + 1), (col, col + 1)))[0, 0])
 
 
-# --- Pipeline step ------------------------------------------------------------
-
-
-def add_access_points(geojson: dict, pbf_path: Path, max_walk_m: float = MAX_WALK_M) -> dict:
+def add_access_points(
+    geojson: dict[str, Any], pbf_path: Path, max_walk_m: float = MAX_WALK_M
+) -> dict[str, Any]:
     """Add access_* properties to every feature of a spots FeatureCollection."""
     features = geojson["features"]
     spots = [(f["geometry"]["coordinates"][1], f["geometry"]["coordinates"][0]) for f in features]
@@ -417,13 +393,13 @@ def add_access_points(geojson: dict, pbf_path: Path, max_walk_m: float = MAX_WAL
         for cell in grid_cells(*_box(list(road.coords))):
             road_index[cell].append(k)
 
-    dem_cache: dict = {}
+    dem_cache: dict[tuple[int, int], rasterio.DatasetReader | None] = {}
     for f, (lat, lon) in zip(features, spots, strict=True):
         cells = grid_cells(*padded_box(lat, lon, max_walk_m))
         near_roads = [roads[k] for k in {k for c in cells for k in road_index.get(c, ())}]
         ap = choose_access_point(lat, lon, near_roads, max_walk_m)
         climb = None
-        if ap.kind == "road":
+        if ap.lat is not None and ap.lon is not None:
             z_spot, z_road = _elevation(lat, lon, dem_cache), _elevation(ap.lat, ap.lon, dem_cache)
             if z_spot is not None and z_road is not None:
                 climb = round(z_spot - z_road)
@@ -441,7 +417,9 @@ def add_access_points(geojson: dict, pbf_path: Path, max_walk_m: float = MAX_WAL
     geojson.setdefault("processing", {})["access_points"] = {
         "max_walk_m": max_walk_m,
         "max_walk_source": "validation/portugal/official_observation_points.csv",
-        "drivable_definition": "OSRM car.lua @214ba8f + Codigo da Estrada art. 72/75 + public access",
+        "drivable_definition": (
+            "OSRM car.lua @214ba8f + Codigo da Estrada art. 72/75 + public access"
+        ),
         "source": f"OpenStreetMap extract {pbf_path.name}",
         "osm_timestamp": osm_timestamp,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -449,7 +427,7 @@ def add_access_points(geojson: dict, pbf_path: Path, max_walk_m: float = MAX_WAL
     return geojson
 
 
-def summarize(geojson: dict) -> dict[str, int]:
+def summarize(geojson: dict[str, Any]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for f in geojson["features"]:
         k = f["properties"].get("access_kind", "missing")
@@ -476,7 +454,7 @@ def main() -> None:
     )
     parser.add_argument("-o", "--output", type=Path, help="output path (default: overwrite input)")
     parser.add_argument(
-        "--osm-pbf", type=Path, default=DEFAULT_OSM_PBF, help="OpenStreetMap .osm.pbf extract"
+        "--osm-pbf", type=Path, default=OSM_PBF, help="OpenStreetMap .osm.pbf extract"
     )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

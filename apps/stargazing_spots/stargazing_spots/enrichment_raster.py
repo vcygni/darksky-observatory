@@ -1,178 +1,59 @@
-"""Raster-native spatial join: sample classified raster at each OSM feature location.
-
-O(n) pixel lookups vs O(n*m) vector intersection.
-"""
+"""Candidate features on dark pixels, with the pixel's radiance, spread and change."""
 
 import logging
 
 import geopandas as gpd
 import numpy as np
-import xarray as xr
+
+from stargazing_spots.change_detection import CHANGE_THRESHOLD
+from stargazing_spots.geo import inside, nearest_index
+from stargazing_spots.processing import TemporalComposite
 
 logger = logging.getLogger(__name__)
 
+WGS84 = 4326
+STABILITY_HIGH, STABILITY_MEDIUM = 0.5, 1.5  # nW/cm2/sr, design choice
 
-def raster_sample_join(
-    dark_sky: xr.DataArray,
-    features: gpd.GeoDataFrame,
-    threshold: float = 3.0,
+
+def features_on_dark_pixels(
+    composite: TemporalComposite, features: gpd.GeoDataFrame, threshold: float
 ) -> gpd.GeoDataFrame:
-    """Identify OSM features located within dark-sky pixels by direct raster sampling.
+    """Point features whose nearest median pixel is below the threshold.
 
-    For each feature point, finds the nearest pixel in the dark-sky raster
-    and checks whether it's below the dark-sky threshold. Features on dark
-    pixels are retained; those on bright or NaN pixels are dropped.
-
-    Args:
-        dark_sky: 2D DataArray of radiance values (NaN = excluded, values = radiance).
-            Should be the output of classify_dark_sky or the median from classify_temporal.
-        features: GeoDataFrame of OSM features with Point geometry (EPSG:4326).
-        threshold: Radiance threshold — pixels below this are "dark".
-            Only used if dark_sky contains raw radiance rather than pre-classified values.
-
-    Returns:
-        Filtered GeoDataFrame containing only features located on dark-sky pixels.
-        Adds columns: 'pixel_radiance' (sampled value) and 'pixel_y_idx', 'pixel_x_idx'.
+    Duplicates (same name and pixel value) are dropped. Adds ``pixel_radiance``,
+    ``pixel_stability``, ``temporal_stability``, ``pixel_trend`` and ``trend_direction``.
     """
-    y_coords = dark_sky.coords["y"].values
-    x_coords = dark_sky.coords["x"].values
-    values = dark_sky.values
+    points = features[features.geometry.geom_type == "Point"].copy()
+    if points.crs and points.crs.to_epsg() != WGS84:
+        points = points.to_crs(epsg=WGS84)
 
-    # Ensure features are points in EPSG:4326
-    points_only = features[features.geometry.geom_type == "Point"].copy()
-    if points_only.crs and points_only.crs.to_epsg() != 4326:
-        points_only = points_only.to_crs(epsg=4326)
+    x = composite.median.coords["x"].values
+    y = composite.median.coords["y"].values
+    lon, lat = points.geometry.x.values, points.geometry.y.values
+    rows, cols = nearest_index(y, lat), nearest_index(x, lon)
+    in_extent = inside(y, lat) & inside(x, lon)
 
-    # Compute pixel resolution for bounds checking
-    y_res = abs(y_coords[1] - y_coords[0]) if len(y_coords) > 1 else 0.005
-    x_res = abs(x_coords[1] - x_coords[0]) if len(x_coords) > 1 else 0.005
-    y_min, y_max = float(y_coords.min()) - y_res / 2, float(y_coords.max()) + y_res / 2
-    x_min, x_max = float(x_coords.min()) - x_res / 2, float(x_coords.max()) + x_res / 2
+    radiance = np.where(in_extent, composite.median.values[rows, cols], np.nan)
+    keep = ~np.isnan(radiance) & (radiance < threshold)
+    dark = points[keep].assign(pixel_radiance=radiance[keep])
+    if "name" in dark.columns:
+        dark = dark.drop_duplicates(subset=["name", "pixel_radiance"])
+    logger.info("Candidates on dark pixels: %d of %d", len(dark), len(features))
 
-    # Sample raster at each feature location
-    radiance_values = []
-    in_bounds = []
-
-    for _, row in points_only.iterrows():
-        lon, lat = row.geometry.x, row.geometry.y
-
-        # Check if point falls within raster extent
-        if lat < y_min or lat > y_max or lon < x_min or lon > x_max:
-            radiance_values.append(np.nan)
-            in_bounds.append(False)
-            continue
-
-        # Find nearest pixel (nearest-neighbor lookup)
-        y_idx = int(np.argmin(np.abs(y_coords - lat)))
-        x_idx = int(np.argmin(np.abs(x_coords - lon)))
-        pixel_val = values[y_idx, x_idx]
-
-        radiance_values.append(pixel_val)
-        in_bounds.append(True)
-
-    points_only["pixel_radiance"] = radiance_values
-    points_only["in_raster_bounds"] = in_bounds
-
-    # Filter: keep only features on dark pixels
-    dark_features = points_only[
-        points_only["in_raster_bounds"]
-        & points_only["pixel_radiance"].notna()
-        & (points_only["pixel_radiance"] < threshold)
-    ].copy()
-
-    # Drop helper columns
-    dark_features = dark_features.drop(columns=["in_raster_bounds"])
-
-    n_input = len(features)
-    n_in_bounds = sum(in_bounds)
-    n_dark = len(dark_features)
-    n_outside = n_input - n_in_bounds
-    n_bright = n_in_bounds - n_dark
-
-    # Deduplicate by name + geometry proximity
-    if "name" in dark_features.columns:
-        pre_dedup = len(dark_features)
-        dark_features = dark_features.drop_duplicates(subset=["name", "pixel_radiance"])
-        n_dark = len(dark_features)
-        if pre_dedup > n_dark:
-            logger.info(
-                "  Deduplicated: %d → %d (removed %d duplicates)",
-                pre_dedup,
-                n_dark,
-                pre_dedup - n_dark,
-            )
-
-    logger.info("Raster-native spatial join:")
-    logger.info("  Input features: %d", n_input)
-    if n_outside > 0:
-        logger.info("  Outside raster extent: %d (skipped)", n_outside)
-    logger.info("  On dark pixels (< %.1f nW): %d", threshold, n_dark)
-    logger.info("  On bright/NaN pixels: %d (excluded)", n_bright)
-
-    return dark_features
-
-
-def raster_sample_with_context(
-    dark_sky: xr.DataArray,
-    features: gpd.GeoDataFrame,
-    stability: xr.DataArray | None = None,
-    trend: xr.DataArray | None = None,
-    threshold: float = 3.0,
-) -> gpd.GeoDataFrame:
-    """Sample dark-sky raster with optional temporal context layers.
-
-    Extends raster_sample_join by also sampling stability and trend rasters
-    at each feature location, adding temporal metadata in one pass.
-
-    Args:
-        dark_sky: Radiance DataArray (classified or median).
-        features: OSM features GeoDataFrame.
-        stability: Optional temporal std deviation DataArray.
-        trend: Optional trend DataArray (last year - first year).
-        threshold: Dark-sky radiance threshold.
-
-    Returns:
-        GeoDataFrame with pixel_radiance, pixel_stability, pixel_trend columns.
-    """
-    dark_features = raster_sample_join(dark_sky, features, threshold)
-
-    if stability is None and trend is None:
-        return dark_features
-
-    y_coords = dark_sky.coords["y"].values
-    x_coords = dark_sky.coords["x"].values
-
-    stab_values = []
-    trend_values = []
-
-    for _, row in dark_features.iterrows():
-        lon, lat = row.geometry.x, row.geometry.y
-        y_idx = int(np.argmin(np.abs(y_coords - lat)))
-        x_idx = int(np.argmin(np.abs(x_coords - lon)))
-
-        if stability is not None:
-            stab_values.append(float(stability.values[y_idx, x_idx]))
-        if trend is not None:
-            trend_values.append(float(trend.values[y_idx, x_idx]))
-
-    if stability is not None:
-        dark_features["pixel_stability"] = stab_values
-        dark_features["temporal_stability"] = dark_features["pixel_stability"].apply(
-            lambda s: "high" if s < 0.5 else ("medium" if s < 1.5 else "low")
-        )
-
-    if trend is not None:
-        # With 3 years of data this is inter-annual variability, not a trend.
-        # The +/-1.0 nW/cm²/sr cut-off is a design choice.
-        dark_features["pixel_trend"] = trend_values
-        dark_features["trend_direction"] = dark_features["pixel_trend"].apply(
-            lambda t: "darkening" if t < -1.0 else ("brightening" if t > 1.0 else "stable")
-        )
-
-    logger.info(
-        "  Added temporal context: stability=%s, trend=%s",
-        "yes" if stability is not None else "no",
-        "yes" if trend is not None else "no",
+    r, c = nearest_index(y, dark.geometry.y.values), nearest_index(x, dark.geometry.x.values)
+    stability = composite.stability.values[r, c].astype(np.float64)
+    trend = composite.trend.values[r, c].astype(np.float64)
+    return dark.assign(
+        pixel_stability=stability,
+        temporal_stability=np.where(
+            stability < STABILITY_HIGH,
+            "high",
+            np.where(stability < STABILITY_MEDIUM, "medium", "low"),
+        ),
+        pixel_trend=trend,
+        trend_direction=np.where(
+            trend < -CHANGE_THRESHOLD,
+            "darkening",
+            np.where(trend > CHANGE_THRESHOLD, "brightening", "stable"),
+        ),
     )
-
-    return dark_features

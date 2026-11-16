@@ -9,8 +9,7 @@ Output: apps/stargazing_spots/input/portugal/boundary/portugal_osm.geojson
 (not committed; OpenStreetMap data, ODbL).
 
 Usage:
-    cd apps/stargazing_spots
-    uv run python ../../scripts/build_boundary.py
+    uv run python scripts/build_boundary.py
 """
 
 import logging
@@ -19,24 +18,25 @@ from pathlib import Path
 import geopandas as gpd
 import osmium
 from shapely import wkb
+from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
-APP = Path(__file__).resolve().parent.parent / "apps" / "stargazing_spots"
-PBF = APP / "input" / "portugal" / "osm" / "portugal-latest.osm.pbf"
-OUTPUT = APP / "input" / "portugal" / "boundary" / "portugal_osm.geojson"
+from stargazing_spots.config import BOUNDARY as OUTPUT
+from stargazing_spots.config import OSM_PBF as PBF
 
 logger = logging.getLogger(__name__)
 
 
-def admin_areas(pbf: Path) -> tuple[list, list]:
-    """(country polygons tagged ISO3166-1=PT, municipality polygons)."""
+def admin_areas(pbf: Path) -> tuple[list[BaseGeometry], list[tuple[str, BaseGeometry]]]:
+    """(country polygons tagged ISO3166-1=PT, (name, municipality polygon))."""
     factory = osmium.geom.WKBFactory()
-    country, municipalities = [], []
+    country: list[BaseGeometry] = []
+    municipalities: list[tuple[str, BaseGeometry]] = []
     fp = osmium.FileProcessor(str(pbf)).with_areas(
         osmium.filter.TagFilter(("boundary", "administrative"))
     )
     for obj in fp:
-        if not obj.is_area() or obj.tags.get("boundary") != "administrative":
+        if not isinstance(obj, osmium.osm.Area) or obj.tags.get("boundary") != "administrative":
             continue
         level = obj.tags.get("admin_level")
         if level not in ("2", "7"):
@@ -48,14 +48,12 @@ def admin_areas(pbf: Path) -> tuple[list, list]:
         if level == "2" and obj.tags.get("ISO3166-1") == "PT":
             country.append(geom)
         elif level == "7":
-            municipalities.append((obj.tags.get("name", ""), geom))
+            municipalities.append((obj.tags.get("name") or "", geom))
     return country, municipalities
 
 
 def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     country, municipalities = admin_areas(PBF)
     if not country:
         raise SystemExit(f"No admin_level=2 ISO3166-1=PT relation in {PBF}")

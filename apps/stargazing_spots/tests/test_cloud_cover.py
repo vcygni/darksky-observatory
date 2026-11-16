@@ -19,7 +19,7 @@ REFERENCE = [
 ]
 
 
-@pytest.mark.parametrize("time, lat, lon, expected", REFERENCE)
+@pytest.mark.parametrize(("time", "lat", "lon", "expected"), REFERENCE)
 def test_sun_altitude_matches_ephemeris(time, lat, lon, expected):
     got = sun_altitude(np.array([time], dtype="datetime64[s]"), lat, lon)[0]
     assert abs(got - expected) < 0.6
