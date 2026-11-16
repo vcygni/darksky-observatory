@@ -20,6 +20,10 @@
 
 Quality flags 1 (poor) and 255 (fill) excluded at ingestion. Gap-filled pixels use KDTree nearest-neighbor interpolation from independently-parsed HDF-EOS5 tiles.
 
+### OpenStreetMap
+
+Candidate features (`osm_extract.py`): nodes tagged with `enrichment.DEFAULT_OSM_TAGS` (peaks, hills, viewpoints, picnic sites, shelters, observatories, ...) from the Geofabrik Portugal extract, clipped to the GADM 4.1 boundary. Replaces the one-off Overpass export of 2026-05-04 (10,898 nodes, incl. one peak in Colombia); the 2026-10-06 extract gives 10,931 nodes, 10,669 identical. The same extract feeds the access-point step, so one OSM snapshot drives the run.
+
 ---
 
 ## 2. Temporal Compositing
@@ -171,7 +175,20 @@ Only SSI >= 65 retained in output.
 **Destination tier:** viewpoints, campsites, picnic sites, nature reserves with facilities.
 **Candidate tier:** peaks, ridgelines, unnamed clearings.
 
-Access types: drive_up (within 100m of road), short_walk (100m-1km), hike_required (>1km), boat_required (offshore).
+Tag-based access hints (`access_check.py`): drive_up / short_walk / hike_required / boat_required from the OSM feature type, with private/gated features excluded. These are heuristics, not measurements.
+
+### Drivable access points (`access_points.py`)
+
+Each spot gets the nearest point on a road a car can legally use **and stop on**, measured on the local OSM extract (`make download-osm`, Geofabrik, replication timestamp recorded in the output):
+
+- **Drivable road:** OSRM car profile (`profiles/car.lua` @214ba8f, 2026-09-27) reproduced in Python: speed-table highway types, access hierarchy motorcar > motor_vehicle > vehicle > access, OSRM white/blacklists, blocked ways, vehicle dimensions. No `highway=track` (no speed in the stock profile).
+- **Legal stopping:** Código da Estrada art. 72.º n.º 2 b) and art. 75.º (text as amended by Lei 72/2013) forbid stopping on motorways, their accesses and *vias reservadas a automóveis e motociclos* → `motorway`, `motorway_link`, `motorroad=yes` excluded.
+- **Public access:** of OSRM's restricted values only `destination` is accepted.
+- **Threshold:** `MAX_WALK_M = 358 m` = the largest road distance among the 18 official observation points in `validation/portugal/official_observation_points.csv` (median 22 m). No official site is farther from a drivable road. Reproduce with `scripts/derive_access_thresholds.py`.
+
+Spots beyond the threshold get `access_kind = "none"` and are not offered as drive-to destinations. Output fields: `access_kind`, `access_lat/lon` (road point), `access_walk_m`, `access_climb_m` (net climb from Copernicus GLO-30, informational: DSM includes trees/structures), `access_road_type`.
+
+Result (2026-10-06 extract): 320 of 658 spots accessible (mainland 243/555, Madeira 25/35, Azores 52/68); walk median 70 m. Coverage of the guide (3 nearest accessible spots, ≥15 km apart, search ≤150 km) over 4,264 OSM cities/towns/villages: 99.7 % get 3 spots; farthest of the 3 median 26 km, max 98 km (Flores/Corvo get 1).
 
 ---
 
@@ -208,12 +225,18 @@ Significant when |delta_R| >= 1.0 nW/cm^2/sr (~0.3-0.4 mag, approximately one Bo
 
 ## 15. Validation Summary
 
+Run with `make validate` (`scripts/run_validation.py`). Results on 2026-10-08:
+
 | Source | N | MAE (mag) | Correlation |
 |--------|---|-----------|-------------|
-| Published SQM | 7 | 0.286 | -- |
-| TESS (best-night max) | 8 | 0.268 | 0.99 |
-| darkskysites.com grid | 1,920 | 0.473 | 0.937 |
-| Expert detection | 20 | -- | 100% within 10km |
+| Published SQM (measured) | 7 | 0.620 | -- |
+| TESS (best-night max) | 20 | 0.739 | -- |
+| darkskysites.com grid | 1,920 | 0.262 | 0.949 |
+| Expert detection | 20 | -- | 20/20 within 10 km (May-candidate run) |
+
+**Reproducibility note.** The report shipped with the first commit (dated 2026-05-09: published-site MAE 0.286, TESS n=8 MAE 0.268, grid MAE 0.473) cannot be reproduced with the code in this repository. Until 2026-10-08 `validate.py` pointed at a non-existent directory (`validation/portugal/portugal`), so every source was silently skipped, and `make validate` failed with an IndentationError. With both fixed, the same model gives the numbers above; the earlier figures came from a model version that is not in the repository.
+
+**Ground-truth corrections (2026-10-08).** Three measured sites had wrong coordinates and were corrected from OSM features/official coordinates: Cumeada observatory (~14 km off), Porta do Mezio (~20 km off; the old point is Gerês town), Monsaraz castle (~1 km off). Published-site MAE 0.649 → 0.620. "Alqueva Lake (eastern shore)" (38.20, −7.80) is Vidigueira town, ~25 km from the lake shore; its true location is unknown and it is flagged, not corrected.
 
 Systematic uncertainty: +/-0.5 mag vs full Garstang RT (single-scatter PSF omits multiple scattering, non-isotropic emission, variable aerosols).
 
@@ -228,6 +251,9 @@ Systematic uncertainty: +/-0.5 mag vs full Garstang RT (single-scatter PSF omits
 5. ERA5 at 25km for islands cannot resolve orographic effects
 6. 3-year stack insufficient for trend significance
 7. No spectral analysis (panchromatic DNB)
+8. Density-cap grid origin depends on the data (`spots.geometry.y.min()` / `.x.min()`): adding or removing one edge spot shifts every 0.25° cell. Re-running on the 2026-10-06 OSM extract swapped 103 of 658 spots with identical SSI for the 555 kept.
+9. Candidate features are OSM nodes only (areas mapped as ways/relations are not candidates).
+10. Access threshold rests on 18 official observation points; drive times in the guide come from the public OSRM server (FOSSGIS profile, which routes tracks) while access points use the stock profile (no tracks).
 
 ---
 

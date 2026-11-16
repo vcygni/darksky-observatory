@@ -7,7 +7,7 @@ Satellite-derived dark-sky mapping pipeline: ingests VIIRS VNP46A4 nighttime rad
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![STAC](https://img.shields.io/badge/STAC-compliant-green.svg)](https://stacspec.org/)
 
-3-year VIIRS median (2023-2025) at 500m resolution, scored by a 6-factor SSI combining PSF-predicted SQM, CLAAS-3/ERA5 cloud climatology, vegetation-aware SVF, land cover, slope, and elevation. Validated against 1,935 ground-truth points (r = 0.937, MAE = 0.286 mag at published sites).
+3-year VIIRS median (2023-2025) at 500m resolution, scored by a 6-factor SSI combining PSF-predicted SQM, CLAAS-3/ERA5 cloud climatology, vegetation-aware SVF, land cover, slope, and elevation. Validated against 1,935 ground-truth points (darkskysites.com grid r = 0.949, MAE = 0.262 mag; published sites MAE = 0.620 mag, see [validation](docs/methodology.md#15-validation-summary)). Each spot gets a drivable access point (OSRM car rules + Portuguese traffic code) from a local OpenStreetMap extract.
 
 ![Dark-Sky Classification](docs/images/portugal_darksky_classification.png)
 
@@ -21,6 +21,7 @@ make test            # 68 tests, no data needed
 cp apps/stargazing_spots/.env.example apps/stargazing_spots/.env
 # Add EARTHDATA_TOKEN + CDS_API_KEY
 make download-data   # ~2GB terrain tiles
+make download-osm    # ~425MB OpenStreetMap extract (candidates + access points)
 make run             # ~36s with local data
 ```
 
@@ -34,7 +35,8 @@ make run             # ~36s with local data
 |--------|-------|
 | Total spots (SSI >= 65) | 658 (555 mainland + 35 Madeira + 68 Azores) |
 | SQM range | 20.56 - 22.06 |
-| Validation MAE (published SQM) | 0.286 mag (7 sites) |
+| Drive-to spots (road ≤ 358 m) | 320 (walk median 70 m) |
+| Validation MAE (published SQM) | 0.620 mag (7 sites; May 2026 report 0.286 not reproducible) |
 | Correlation (darkskysites.com) | 0.937 (1,920 points) |
 | Expert detection | 100% within 10 km |
 
