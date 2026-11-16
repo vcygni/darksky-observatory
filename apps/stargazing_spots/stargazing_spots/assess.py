@@ -272,7 +272,7 @@ def filter_unsuitable(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     """
     n_initial = len(spots)
 
-    # Primary filter: SVF-based sky visibility (strict: need 70%+ of sky visible)
+    # Primary filter: SVF >= 0.7 (design choice)
     if "sky_view_factor" in spots.columns:
         obstructed = spots["sky_view_factor"] < 0.7
         n_obstructed = obstructed.sum()

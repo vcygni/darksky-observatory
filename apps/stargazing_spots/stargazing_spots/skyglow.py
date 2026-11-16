@@ -13,26 +13,29 @@ from scipy.signal import fftconvolve
 
 logger = logging.getLogger(__name__)
 
-NATURAL_SKY_MCDM2 = 0.171  # Natural zenith brightness (mcd/m^2), Falchi 2016
-NATURAL_SKY_SQM = 22.0  # mag/arcsec^2 at solar minimum
+# Natural zenith luminance, 171 ucd/m^2 (Duriscoe et al. 2018, JQSRT 214).
+NATURAL_SKY_MCDM2 = 0.171
+# Natural sky at solar minimum, 22.0 mag/arcsec^2 (Falchi et al. 2016).
+NATURAL_SKY_SQM = 22.0
 
 # Least-squares fit to the TESS clear-sky pixels (scripts/fit_calibration.py,
 # validation/portugal/calibration_loo.json).
 CALIB_FACTOR = 0.07467
 
-# Atmospheric extinction (Portuguese atmosphere, tau_aerosol ~0.15)
-EXTINCTION_RATE = 0.0187  # per km
+# Design choice: exponential attenuation with distance (per km); not fitted.
+EXTINCTION_RATE = 0.0187
 
 
 @dataclass
 class PropagationConfig:
     """Configuration for the skyglow propagation model."""
 
-    integration_radius_km: float = 200.0
-    psf_exponent: float = 2.5  # Walker/Garstang: d^(-2.5)
-    pixel_size_km: float = 0.42  # VIIRS VNP46A4 at ~39°N
-    softening_km: float = 1.0  # Near-field softening (Duriscoe 2018)
-    extinction_rate: float = EXTINCTION_RATE  # Atmospheric extinction (per km)
+    integration_radius_km: float = 200.0  # design choice (Falchi et al. 2016 use 195 km)
+    psf_exponent: float = 2.5  # Walker's law, distance^-2.5
+    # 15" grid: 0.46 km N-S, 0.36 km E-W at 39 N; treated as square
+    pixel_size_km: float = 0.42
+    softening_km: float = 1.0  # design choice: d0 in (d + d0)^-2.5, avoids d = 0
+    extinction_rate: float = EXTINCTION_RATE
 
 
 def build_psf_kernel(
@@ -50,7 +53,7 @@ def build_psf_kernel(
         radius_km: Integration radius.
         pixel_size_km: Pixel size in km.
         exponent: Power-law exponent.
-        softening_km: Duriscoe (2018) near-field softening d0.
+        softening_km: Near-field offset d0.
         extinction_rate: Atmospheric extinction (per km).
 
     Returns:
@@ -126,15 +129,10 @@ def compute_sky_brightness(
 def brightness_to_sqm(artificial_mcdm2: np.ndarray) -> np.ndarray:
     """Convert artificial sky brightness to predicted SQM reading.
 
-    SQM measures total sky brightness (artificial + natural background).
-    The natural sky at a pristine site is 0.171 mcd/m² (22.0 mag/arcsec²).
-
-    Standard formula (from lightpollutionmap.info, Falchi):
-        SQM = log10(total_brightness_mcd / 108000000) / (-0.4)
-        Simplifies to: SQM = -2.5 × log10(S_cd) + 12.583
-
-    Verification: natural = 0.171 mcd/m² = 1.71×10⁻⁴ cd/m²
-        → SQM = -2.5×log10(1.71e-4) + 12.583 = 22.0 ✓
+    SQM = -2.5 log10(L / 108000), L = artificial + natural luminance in cd/m²,
+    i.e. -2.5 log10(L) + 12.583. With this zero point 0.171 mcd/m² gives
+    22.0 mag/arcsec² (Falchi et al. 2016: 22 mag/arcsec² "equivalent to
+    1.7 × 10−4 cd/m2").
 
     Args:
         artificial_mcdm2: Predicted artificial sky brightness in mcd/m².
@@ -154,7 +152,8 @@ def brightness_to_sqm(artificial_mcdm2: np.ndarray) -> np.ndarray:
 def sqm_to_bortle(sqm: np.ndarray) -> np.ndarray:
     """Classify SQM readings into Bortle scale classes.
 
-    Based on correlations from Bortle (2001) and observational data.
+    Approximate SQM ranges per class; the Bortle scale itself is defined by
+    naked-eye observations, not SQM values.
 
     Args:
         sqm: Array of SQM values (mag/arcsec²).
@@ -177,12 +176,8 @@ def sqm_to_bortle(sqm: np.ndarray) -> np.ndarray:
 def classify_stargazing_quality(sqm: float) -> str:
     """Human-readable stargazing quality from SQM value.
 
-    Based on Bortle scale correlations:
-        excellent (Bortle 1-2): Zodiacal light visible, Milky Way casts shadows
-        good (Bortle 3): Milky Way with structure, M33 visible
-        acceptable (Bortle 4): Milky Way obvious, some light domes on horizon
-        poor (Bortle 5-6): Milky Way weak or invisible
-        urban (Bortle 7+): Only bright stars visible
+    Labels use the same SQM cut-offs as sqm_to_bortle: excellent >= 21.5,
+    good >= 21.0, acceptable >= 20.4, poor >= 19.5, else urban.
     """
     if np.isnan(sqm):
         return "unknown"

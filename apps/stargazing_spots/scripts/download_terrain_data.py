@@ -1,9 +1,9 @@
 """Download all terrain/land cover tiles for Portugal (one-time setup).
 
-Downloads ~3.4 GB of raster data covering all of Portugal:
-- Copernicus GLO-30 DEM (7 tiles, ~1.4 GB)
-- ESA WorldCover 10m (3 tiles, ~1.2 GB)
-- Hansen Global Forest Change (2 tiles, ~800 MB)
+Downloads about 2 GB of raster data covering Portugal (measured local cache):
+- Copernicus GLO-30 DEM (~1.1 GB)
+- ESA WorldCover 10m (~0.5 GB)
+- Hansen Global Forest Change (~0.4 GB)
 
 After download, the pipeline reads locally — zero network calls during runs.
 Run once: `uv run python scripts/download_terrain_data.py`
@@ -165,7 +165,7 @@ def download_hansen():
 if __name__ == "__main__":
     print("=== Downloading terrain data for Portugal ===")
     print(f"Output: {BASE / 'input' / 'portugal'}")
-    print("Expected total size: ~3.4 GB")
+    print("Expected total size: ~2 GB")
     print()
 
     download_copernicus_dem()

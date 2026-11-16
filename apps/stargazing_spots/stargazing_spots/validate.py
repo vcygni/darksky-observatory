@@ -1,6 +1,6 @@
 """Validation of the PSF sky-brightness model against independent ground truth.
 
-Sources and how each is used (see docs/methodology.md §15):
+Sources and how each is used (see docs/methodology.md §14):
 
 * TESS photometers (primary): clear-sky moonless zenith brightness per site,
   derived from the raw readings by scripts/derive_tess_clear_sky.py (header

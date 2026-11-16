@@ -1,6 +1,6 @@
 """Dark-sky classification from VIIRS nighttime radiance.
 
-Threshold at 3 nW/cm2/sr (Bortle 3-4 boundary). Input must be EPSG:4326.
+Default threshold 3 nW/cm2/sr (design choice; see sensitivity.py). Input must be EPSG:4326.
 """
 
 import logging

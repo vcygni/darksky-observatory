@@ -76,7 +76,7 @@ def assess_access(spots: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
         warnings = []
         access_type = "unknown"
         accessible = True  # assume accessible unless evidence says otherwise
-        score = 0.7  # default: probably accessible
+        score = 0.7  # default; all access scores in this function are design choices
 
         # Determine access type from feature tags
         for tag_col, type_map in [

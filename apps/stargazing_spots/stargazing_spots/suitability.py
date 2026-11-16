@@ -2,6 +2,9 @@
 
 Weights: darkness 0.30, clear_sky 0.25, SVF 0.15, land_cover 0.15,
 slope 0.10, elevation 0.05. Output: 0-100 score per spot.
+
+The weights, the normalisation ranges and the class cut-offs are design
+choices; they are not fitted to observations.
 """
 
 import logging
@@ -40,21 +43,7 @@ class SSIWeights:
 def normalize_darkness(predicted_sqm: np.ndarray) -> np.ndarray:
     """Normalize SQM prediction to [0, 1] suitability score.
 
-    Normalizes over the dark-site range (20.0–22.0) for discrimination
-    among candidate stargazing sites:
-
-        SQM 22.0 (pristine) → 1.0
-        SQM 21.0 (good)     → 0.5
-        SQM 20.0 (marginal) → 0.0
-
-    With the softened PSF (Duriscoe d₀=1km), the model is unbiased
-    (MAE 0.32 mag, bias -0.02) so no bias correction is needed.
-    The range 20.0-22.0 provides good discrimination for dark sites
-    while correctly scoring suburban pixels (SQM 18-20) at zero.
-
-    Note: The +0.5 mag systematic bias (vs full Garstang RT) is implicitly
-    absorbed here — a "score=1.0" spot has predicted SQM 22.0 but real sky
-    ~21.5, and "score=0.5" predicts 21.0 but real sky ~20.5.
+    Linear over 20.0-22.0 mag/arcsec² (design choice): 20.0 -> 0, 22.0 -> 1.
     """
     return np.clip((predicted_sqm - 20.0) / (22.0 - 20.0), 0, 1)
 
@@ -62,8 +51,7 @@ def normalize_darkness(predicted_sqm: np.ndarray) -> np.ndarray:
 def normalize_clear_sky(clear_fraction: np.ndarray) -> np.ndarray:
     """Normalize clear-night fraction to [0, 1].
 
-    Already in [0, 1] from the ERA5 computation.
-    Apply slight power scaling to reward consistently clear sites.
+    Already a fraction from cloud_cover; clipped to [0, 1].
     """
     return np.clip(clear_fraction, 0, 1)
 
@@ -71,11 +59,7 @@ def normalize_clear_sky(clear_fraction: np.ndarray) -> np.ndarray:
 def normalize_sky_openness(svf: np.ndarray) -> np.ndarray:
     """Normalize Sky View Factor to [0, 1] suitability.
 
-    SVF 1.0 (fully open)    → 1.0
-    SVF 0.85 (minor hills)  → 0.75 (still good)
-    SVF 0.5 (obstructed)    → 0.0
-
-    Linear between 0.5 and 1.0; below 0.5 is unsuitable.
+    Linear over 0.5-1.0 (design choice): SVF <= 0.5 -> 0, 1.0 -> 1.
     """
     return np.clip((svf - 0.5) / 0.5, 0, 1)
 
@@ -83,11 +67,7 @@ def normalize_sky_openness(svf: np.ndarray) -> np.ndarray:
 def normalize_elevation(elevation_m: np.ndarray) -> np.ndarray:
     """Normalize elevation to [0, 1] bonus.
 
-    0m      → 0.0 (sea level, more atmosphere)
-    500m    → 0.33
-    1500m+  → 1.0 (significant atmospheric reduction)
-
-    Capped at 1500m for Portugal context (max ~2000m Serra da Estrela).
+    Linear over 0-1500 m, capped at 1 (design choice).
     """
     return np.clip(elevation_m / 1500.0, 0, 1)
 

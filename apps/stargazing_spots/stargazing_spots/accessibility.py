@@ -147,7 +147,7 @@ def compute_slope_at_points(
 
 
 def classify_slope(slope_degrees: float) -> tuple[float, str]:
-    """Convert slope to suitability score and label.
+    """Convert slope to suitability score and label (cut-offs and scores are a design choice).
 
     Args:
         slope_degrees: Terrain slope in degrees.

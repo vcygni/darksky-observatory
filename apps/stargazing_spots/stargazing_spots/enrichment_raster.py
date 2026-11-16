@@ -162,8 +162,8 @@ def raster_sample_with_context(
         )
 
     if trend is not None:
-        # Note: with 3 years of data, this is inter-annual variability, not a
-        # confirmed long-term trend (Kyba et al. 2017: need 5+ years).
+        # With 3 years of data this is inter-annual variability, not a trend.
+        # The +/-1.0 nW/cm²/sr cut-off is a design choice.
         dark_features["pixel_trend"] = trend_values
         dark_features["trend_direction"] = dark_features["pixel_trend"].apply(
             lambda t: "darkening" if t < -1.0 else ("brightening" if t > 1.0 else "stable")

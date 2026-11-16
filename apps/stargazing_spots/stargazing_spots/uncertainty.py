@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ConfidenceWeights:
-    """Weights for the confidence model components."""
+    """Weights for the confidence model components (design choice)."""
 
     distance: float = 0.4
     stability: float = 0.3

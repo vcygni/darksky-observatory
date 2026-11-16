@@ -15,17 +15,6 @@ import xarray as xr
 
 logger = logging.getLogger(__name__)
 
-PIXEL_AREA_KM2 = 0.25  # Each 500m × 500m pixel ≈ 0.25 km²
-
-BORTLE_ANNOTATIONS = {
-    0.5: "Bortle 1 (Excellent dark site)",
-    1.0: "Bortle 2 (Typical dark site)",
-    2.0: "Bortle 3 (Rural sky)",
-    3.0: "Bortle 3-4 (Rural/suburban transition)",
-    5.0: "Bortle 4-5 (Suburban sky)",
-    10.0: "Bortle 5-6 (Bright suburban)",
-}
-
 DEFAULT_THRESHOLDS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0, 10.0]
 
 
@@ -37,7 +26,17 @@ class ThresholdResult:
     dark_pixels: int
     dark_area_km2: float
     dark_pct: float
-    bortle_class: str
+
+
+def _pixel_area_km2(radiance: xr.DataArray) -> np.ndarray:
+    """Area of each cell of a regular lat/lon grid (km²), broadcast to the array shape."""
+    x = radiance.coords["x"].values
+    y = radiance.coords["y"].values
+    dx = abs(float(x[1] - x[0])) if len(x) > 1 else 0.0
+    dy = abs(float(y[1] - y[0])) if len(y) > 1 else 0.0
+    km_per_deg = 111.32
+    row_area = (dy * km_per_deg) * (dx * km_per_deg * np.cos(np.radians(y)))
+    return np.broadcast_to(row_area[:, None], radiance.shape[-2:]).reshape(radiance.shape)
 
 
 def run_sensitivity(
@@ -48,9 +47,8 @@ def run_sensitivity(
 
     For each threshold, computes:
         - Number of dark pixels
-        - Approximate dark-sky area in km²
+        - Dark-sky area in km² (pixel area from the grid spacing and latitude)
         - Percentage of total valid pixels
-        - Corresponding Bortle class
 
     Args:
         radiance: Cleaned radiance DataArray (should have negatives/fill already removed).
@@ -58,7 +56,7 @@ def run_sensitivity(
 
     Returns:
         DataFrame with one row per threshold, columns:
-            threshold, dark_pixels, dark_area_km2, dark_pct, bortle_class, marginal_gain_pct
+            threshold, dark_pixels, dark_area_km2, dark_pct, marginal_gain_pct
     """
     if thresholds is None:
         thresholds = DEFAULT_THRESHOLDS
@@ -66,6 +64,7 @@ def run_sensitivity(
     values = radiance.values
     valid_mask = ~np.isnan(values)
     valid_values = values[valid_mask]
+    pixel_km2 = _pixel_area_km2(radiance)[valid_mask]
     total_valid = len(valid_values)
 
     logger.info(
@@ -76,18 +75,10 @@ def run_sensitivity(
     prev_dark = 0
 
     for t in sorted(thresholds):
-        dark_count = int(np.sum(valid_values < t))
-        dark_area = dark_count * PIXEL_AREA_KM2
+        dark = valid_values < t
+        dark_count = int(np.sum(dark))
+        dark_area = float(pixel_km2[dark].sum())
         dark_pct = 100 * dark_count / max(total_valid, 1)
-
-        # Find nearest Bortle annotation
-        bortle = ""
-        for bortle_thresh, label in sorted(BORTLE_ANNOTATIONS.items()):
-            if t <= bortle_thresh:
-                bortle = label
-                break
-        if not bortle:
-            bortle = "Bortle 6+ (Urban)"
 
         # Marginal gain: how many MORE pixels vs previous threshold
         marginal = dark_count - prev_dark
@@ -100,7 +91,6 @@ def run_sensitivity(
                 "dark_pixels": dark_count,
                 "dark_area_km2": round(dark_area, 1),
                 "dark_pct": round(dark_pct, 2),
-                "bortle_class": bortle,
                 "marginal_gain_pixels": marginal,
                 "marginal_gain_pct": round(marginal_pct, 2),
             }
@@ -110,18 +100,15 @@ def run_sensitivity(
 
     # Log summary
     logger.info("Sensitivity results:")
-    logger.info(
-        "  %-8s %-12s %-12s %-10s %s", "Thresh", "Dark px", "Area (km²)", "% total", "Bortle"
-    )
+    logger.info("  %-8s %-12s %-12s %s", "Thresh", "Dark px", "Area (km²)", "% total")
     for _, row in df.iterrows():
         marker = " ◄" if row["threshold_nw"] == 3.0 else ""
         logger.info(
-            "  %-8.1f %-12d %-12.0f %-10.1f %s%s",
+            "  %-8.1f %-12d %-12.0f %-10.1f%s",
             row["threshold_nw"],
             row["dark_pixels"],
             row["dark_area_km2"],
             row["dark_pct"],
-            row["bortle_class"],
             marker,
         )
 
@@ -164,7 +151,7 @@ def otsu_threshold(radiance: xr.DataArray, n_bins: int = 256, max_val: float = 2
     (artificial light).
 
     This is the same algorithm used in image segmentation — here applied to
-    satellite radiometry. Used in Liu et al. (2019) for VIIRS urban extraction.
+    satellite radiometry (Otsu 1979).
 
     Args:
         radiance: Cleaned radiance DataArray.
@@ -444,10 +431,10 @@ def full_threshold_justification(
     logger.info("  Otsu (data-driven):         %.2f nW/cm²/sr", otsu)
     logger.info("  Validation (ground-truth):   %.1f nW/cm²/sr", val_optimal)
     logger.info("  Elbow (diminishing returns): %.1f nW/cm²/sr", elbow)
-    logger.info("  Literature (Falchi 2016):    3.0 nW/cm²/sr")
+    logger.info("  Pipeline default:            3.0 nW/cm²/sr")
     logger.info("")
 
-    mean_threshold = np.mean([otsu, val_optimal, elbow, 3.0])
+    mean_threshold = np.mean([otsu, val_optimal, elbow])
     logger.info("  Mean of all methods: %.2f nW/cm²/sr", mean_threshold)
 
     return {

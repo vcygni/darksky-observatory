@@ -52,8 +52,8 @@ darksky-observatory/
 └───────────────────────────────────────┬─────────────────────────────────┘
                                         │
 ┌───────────────────────────────────────▼─────────────────────────────────┐
-│  STAGE 12-14: TIERING + PLANNING + CHANGE DETECTION                      │
-│  access_check.py + observation_planning.py + change_detection.py         │
+│  STAGE 12-14: TIERING + CHANGE DETECTION                                 │
+│  access_check.py + change_detection.py                                   │
 └───────────────────────────────────────┬─────────────────────────────────┘
                                         │
 ┌───────────────────────────────────────▼─────────────────────────────────┐
@@ -79,7 +79,6 @@ darksky-observatory/
 | `suitability` | SSI weighted linear combination |
 | `assess` | Assessment orchestrator (parallel SVF/land_cover/slope) |
 | `access_check` | Nighttime access classification, island detection |
-| `observation_planning` | Milky Way season, best months |
 | `change_detection` | Multi-temporal trend analysis |
 | `uncertainty` | Per-pixel confidence scoring |
 | `sensitivity` | Threshold analysis (Otsu + validation-calibrated) |

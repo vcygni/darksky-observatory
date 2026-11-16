@@ -39,7 +39,7 @@ LAND_COVER_CLASSES = {
     100: "moss_lichen",
 }
 
-# Base suitability mapping for NON-tree classes: code → (score 0-1, label)
+# Suitability for non-tree classes, code -> (score 0-1, label). Design choice.
 # Tree cover (10) is handled probabilistically via Hansen canopy cover.
 SUITABILITY = {
     10: (None, "probabilistic"),  # Determined by Hansen canopy cover
@@ -55,7 +55,7 @@ SUITABILITY = {
     100: (0.8, "good"),  # moss/lichen — open, high altitude
 }
 
-# Probabilistic tree cover thresholds for suitability labels
+# Canopy-fraction cut-offs for the tree-cover labels (design choice)
 TREE_PROB_THRESHOLDS = {
     "high_suitability": 0.3,  # canopy < 30% → open woodland, good for stargazing
     "low_suitability": 0.8,  # canopy > 80% → dense forest, unsuitable

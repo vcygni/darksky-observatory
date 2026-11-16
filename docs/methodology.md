@@ -67,7 +67,7 @@ PSF(d) = (d + d_0)^(-2.5) * exp(-beta * d)
 | beta | 0.0187 km^-1 | Atmospheric extinction |
 | Exponent | -2.5 | Walker (1977), Cinzano (2001) |
 | Radius | 200 km | |
-| CALIB_FACTOR | 0.04237 | Origin not reproducible (see §15); leave-one-out check in `scripts/fit_calibration.py` |
+| CALIB_FACTOR | 0.04237 | Origin not reproducible (see §14); leave-one-out check in `scripts/fit_calibration.py` |
 
 SQM conversion:
 ```
@@ -186,17 +186,7 @@ Result (current output, OSM extract timestamp 2026-10-06T20:21:06Z): 316 of 658 
 
 ---
 
-## 12. Seasonal SSI and Observation Planning
-
-```
-SSI_season = SSI_annual - w_cloud * (CKF_annual - CKF_season)
-```
-
-Milky Way core (Sgr A*, Dec -29 deg) visibility computed per-spot latitude. At Portugal (~38-42 deg N): visible Apr-Oct, peak Aug, max altitude ~20-25 deg.
-
----
-
-## 13. Change Detection
+## 12. Change Detection
 
 ```
 delta_R = R_2025 - R_2023
@@ -206,7 +196,7 @@ Significant when |delta_R| >= 1.0 nW/cm^2/sr (~0.3-0.4 mag, approximately one Bo
 
 ---
 
-## 14. Export Formats
+## 13. Export Formats
 
 | Format | Use Case |
 |--------|----------|
@@ -217,7 +207,7 @@ Significant when |delta_R| >= 1.0 nW/cm^2/sr (~0.3-0.4 mag, approximately one Bo
 
 ---
 
-## 15. Validation Summary
+## 14. Validation Summary
 
 Run with `make validate` (`scripts/run_validation.py`) and `scripts/fit_calibration.py`. Results on 2026-11-16; full tables in [validation_report.md](validation_report.md).
 
@@ -240,7 +230,7 @@ Systematic uncertainty: +/-0.5 mag vs full Garstang RT (single-scatter PSF omits
 
 ---
 
-## 16. Limitations
+## 15. Limitations
 
 1. 500m pixel resolution: mixed pixels at urban fringes
 2. Single-layer PSF omits aerosol profiles, humidity, wavelength dependence
@@ -256,7 +246,7 @@ Systematic uncertainty: +/-0.5 mag vs full Garstang RT (single-scatter PSF omits
 
 ---
 
-## 17. References
+## 16. References
 
 - Aksaker, N. et al. (2020). MNRAS 493(1), 1204-1216.
 - Cinzano, P., Falchi, F. & Elvidge, C.D. (2001). MNRAS 328(3), 689-707.

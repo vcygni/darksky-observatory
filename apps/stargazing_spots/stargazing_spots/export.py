@@ -76,16 +76,6 @@ def to_geojson(
         "night_accessible",
         "access_warnings",
         "stargazing_score",
-        # Seasonal
-        "ssi_summer",
-        "ssi_winter",
-        "ssi_spring",
-        "ssi_autumn",
-        "best_season",
-        # Observation planning
-        "mw_best_months",
-        "mw_max_altitude_deg",
-        "mw_peak_month",
         # OSM context (only if useful)
         "tourism",
         "natural",

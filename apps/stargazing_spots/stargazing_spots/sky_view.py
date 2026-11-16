@@ -26,8 +26,8 @@ _LOCAL_HANSEN_DIR = Path(__file__).parent.parent / "input" / "portugal" / "hanse
 HANSEN_BASE = "https://storage.googleapis.com/earthenginepartners-hansen/GFC-2023-v1.11"
 
 # SVF computation parameters
-N_DIRECTIONS = 16  # azimuth rays (16 = good accuracy/speed balance)
-MAX_RADIUS_PX = 50  # search radius in pixels (50 × 30m = 1.5km)
+N_DIRECTIONS = 16  # azimuth rays (design choice)
+MAX_RADIUS_PX = 50  # search radius in pixels (50 × 30 m = 1.5 km, design choice)
 CELL_SIZE_M = 30.0  # Copernicus GLO-30 pixel size in meters
 
 

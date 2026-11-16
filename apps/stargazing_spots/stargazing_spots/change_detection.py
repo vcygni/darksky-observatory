@@ -1,7 +1,8 @@
 """Multi-temporal radiance change detection (2023-2025).
 
 Pairwise and overall trend classification. With 3 years, results represent
-inter-annual variability, not confirmed trends (Kyba et al. 2017).
+inter-annual variability, not trends. The 1.0 nW/cm²/sr change threshold is a
+design choice.
 """
 
 import logging
