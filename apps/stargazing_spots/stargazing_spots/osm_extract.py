@@ -5,8 +5,8 @@ Replaces the one-off Overpass export (input/portugal/osm/osm_features_portugal.g
 snapshot (``make download-osm``) and no online API is needed.
 
 Selection is ``enrichment.DEFAULT_OSM_TAGS`` (the same tags ``fetch_osm_features``
-queries), nodes only as in the previous export, clipped to the GADM Portugal
-boundary. Every OSM tag is kept as a column, plus ``@id``/``id`` = "node/<id>".
+queries), nodes only as in the previous export, clipped to the Portugal land
+boundary built from the same extract (``make boundary``). Every OSM tag is kept as a column, plus ``@id``/``id`` = "node/<id>".
 
 Usage:
     python -m stargazing_spots.osm_extract [-o features.geojson]
@@ -27,7 +27,7 @@ from stargazing_spots.enrichment import DEFAULT_OSM_TAGS
 logger = logging.getLogger(__name__)
 
 DEFAULT_BOUNDARY = (
-    Path(__file__).parent.parent / "input" / "portugal" / "boundary" / "gadm41_PRT_1.json.zip"
+    Path(__file__).parent.parent / "input" / "portugal" / "boundary" / "portugal_osm.geojson"
 )
 
 

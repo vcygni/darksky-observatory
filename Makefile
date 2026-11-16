@@ -1,4 +1,4 @@
-.PHONY: install test lint run access-points download-osm validate clean docker-build docker-run
+.PHONY: install test lint run access-points download-osm boundary validate clean docker-build docker-run
 
 # === Setup ===
 install:
@@ -16,6 +16,10 @@ download-osm:
 	curl -fsSL $(OSM_PBF_URL).md5 | sed 's/portugal-latest.osm.pbf/portugal-latest.osm.pbf.part/' \
 		| (cd $(OSM_DIR) && md5sum -c -)
 	mv $(OSM_DIR)/portugal-latest.osm.pbf.part $(OSM_DIR)/portugal-latest.osm.pbf
+
+# Portugal land boundary from the OSM extract (municipality union)
+boundary:
+	cd apps/stargazing_spots && uv run python ../../scripts/build_boundary.py
 
 # === Development ===
 test:

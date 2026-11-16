@@ -11,7 +11,7 @@
 | Forest Canopy | U. Maryland | Hansen GFC v1.11 | 30m | GCS (public) |
 | Land Cover | ESA | WorldCover v200 | 10m | AWS S3 (public) |
 | Points of Interest | OSM Foundation | Overpass API | Vector | Public |
-| Admin Boundaries | UC Davis | GADM v4.1 | Vector | gadm.org |
+| Land boundary | OpenStreetMap | admin_level=7 union | Vector | Geofabrik extract |
 | Validation (TESS) | Stars4All | TESS-IDA network | Point | api.stars4all.eu |
 | Validation (SQM) | Literature | Field measurements | Point | Papers |
 

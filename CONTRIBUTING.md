@@ -35,8 +35,7 @@ cp apps/stargazing_spots/.env.example apps/stargazing_spots/.env
 **One-time setup:**
 
 1. VIIRS: set `EARTHDATA_TOKEN`, pipeline downloads and caches (~50 MB, 5-10 min).
-2. GADM boundary: download from gadm.org, save as `input/portugal/boundary/gadm41_PRT_1.json.zip`.
-3. OSM features: export from Overpass Turbo (~2 min) or let pipeline query directly (~30 min).
+2. OpenStreetMap: `make download-osm`, then `make boundary` (Portugal land boundary from the extract).
 4. CLAAS-3 (optional): register at wui.cmsaf.eu, order CFC monthly product, place in `input/portugal/cache/claas3/`.
 
 ## Running the Pipeline
@@ -72,7 +71,7 @@ make docker-run
 
 ```bash
 mkdir -p apps/stargazing_spots/input/spain/{boundary,cache,osm}
-# Add GADM boundary + OSM features for the target country
+# Add a land boundary + OSM extract for the target country
 uv run python -m stargazing_spots --place "Spain" --output-dir output/spain
 ```
 

@@ -513,10 +513,10 @@ def _run_single(args):
             / "input"
             / "portugal"
             / "boundary"
-            / "gadm41_PRT_1.json.zip"
+            / "portugal_osm.geojson"
         )
         if not boundary_path.exists():
-            logger.error("Boundary file not found: %s", boundary_path)
+            logger.error("Boundary file not found: %s (run `make boundary`)", boundary_path)
             raise SystemExit(1)
 
         boundary_gdf = gpd.read_file(str(boundary_path))

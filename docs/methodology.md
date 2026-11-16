@@ -22,7 +22,7 @@ Quality flags 1 (poor) and 255 (fill) excluded at ingestion. Gap-filled pixels u
 
 ### OpenStreetMap
 
-Candidate features (`osm_extract.py`): nodes tagged with `enrichment.DEFAULT_OSM_TAGS` (peaks, hills, viewpoints, picnic sites, shelters, observatories, ...) from the Geofabrik Portugal extract, clipped to the GADM 4.1 boundary. Replaces the one-off Overpass export of 2026-05-04 (10,898 nodes, incl. one peak in Colombia); the 2026-10-06 extract gives 10,931 nodes, 10,669 identical. The same extract feeds the access-point step, so one OSM snapshot drives the run.
+Candidate features (`osm_extract.py`): nodes tagged with `enrichment.DEFAULT_OSM_TAGS` (peaks, hills, viewpoints, picnic sites, shelters, observatories, ...) from the Geofabrik Portugal extract, clipped to the Portugal land boundary (union of the 308 OSM municipalities, `scripts/build_boundary.py`). Replaces the one-off Overpass export of 2026-05-04 (10,898 nodes, incl. one peak in Colombia); the 2026-10-06 extract gives 10,931 nodes, 10,669 identical. The same extract feeds the access-point step, so one OSM snapshot drives the run.
 
 ---
 
